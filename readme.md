@@ -83,7 +83,9 @@ tb1.is_exhausted()
 ```
 
 **`image1` from the above example:**
+
 ![tb1](documentation/image1.png)
 
 **`image2` from the above example:**
+
 ![tb2](documentation/image2.png)
