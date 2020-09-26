@@ -1,6 +1,6 @@
 # piltextbox
 
-An extension for the Pillow (PIL) library for streamlined writing of text in an image, with automatic textwrapping and optional text-block justification.
+An extension for the [Pillow (PIL) library](https://pypi.org/project/Pillow/) for streamlined writing of text in an image, with automatic textwrapping and optional text-block justification.
 
 ### Quickstart
 
