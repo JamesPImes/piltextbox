@@ -1,10 +1,16 @@
 # piltextbox
 
-An extension for the [Pillow (PIL) library](https://pypi.org/project/Pillow/) for streamlined writing of text in an image, with automatic textwrapping and optional text-block justification.
+A package for streamlined writing of text in an image with the [Pillow (PIL) library](https://pypi.org/project/Pillow/), with automatic textwrapping and indendation, optional text-block justification, and configurable font settings.
+
+### To install
+```
+pip install Pillow
+pip install piltextbox
+```
 
 ### Quickstart
 
-The quickstart code below will write these sample lines:
+The quickstart example code below will write these 'lorem ipsum' lines:
 ```
 line_sample_1 = 'Lorem ipsum dolor sit amet, consectetur adipiscing'
 
@@ -72,14 +78,17 @@ image2 = tb2.render()
 # Misc. methods for checking how much space is left:
 
 # How many lines can still be written in the TextBox, using the current font:
-tb1.lines_left()
+tb1.lines_left()  # returns 0
+tb2.lines_left()  # returns 13
 
 # Whether we're on the last line of the TextBox, using the current font:
-tb1.on_last_line()
+tb1.on_last_line()  # returns False
+tb2.on_last_line()  # returns False
 
 # Whether the current TextBox is exhausted (i.e. out of room to write,
 # using the current font):
-tb1.is_exhausted()
+tb1.is_exhausted()  # returns True
+tb2.is_exhausted()  # returns False
 ```
 
 **`image1` from the above example:**
