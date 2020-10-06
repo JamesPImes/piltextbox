@@ -6,6 +6,7 @@ and methods for configuring and writing text.
 """
 
 from PIL import Image, ImageDraw, ImageFont
+from .formatting import format_parse, flat_parse, FWord
 
 class TextBox:
     """
@@ -614,7 +615,7 @@ class TextBox:
     def write_justified_line(
             self, text, cursor='text_cursor', font_RGBA=None,
             reserve_last_line=False, override_legal_check=False,
-            indent=None) -> list:
+            indent=None, formatting=False) -> list:
         """
         Write a justified line of text at the specified cursor, after
         first confirming that the line can fit within the textbox. (May
@@ -656,7 +657,7 @@ class TextBox:
 
         orig_text = text
 
-        font = self.font
+        def_font = self.font
         if font_RGBA is None:
             font_RGBA = self.font_RGBA
 
@@ -677,21 +678,35 @@ class TextBox:
         indent = ' ' * indent
 
         # Get the width of our indent in px
-        indent_w, indent_h = self.text_draw.textsize(indent, font=font)
+        indent_w, indent_h = self.text_draw.textsize(indent, font=def_font)
+
+        # Get the width of a single space character in px
+        space_w, _ = self.text_draw.textsize(' ', font=def_font)
 
         # The number of pixels we have available to write all words:
         w_remain = self.im.width - indent_w
 
-        words = text.split(' ')
+        if formatting:
+            fwords = format_parse(text)
+        else:
+            fwords = flat_parse(text)
 
         # Get the width, height (in px) of each word, and the total for
-        # all words
+        # all words; also get the font typeface
         word_px_dict = {}
         total_word_w = 0
         total_word_h = 0
-        for word in words:
-            word_w, word_h = self.text_draw.textsize(word, font=font)
-            word_px_dict[word] = (word_w, word_h)
+        font_dict = {}
+        for fword in fwords:
+            # Get the styling for this word (e.g., 'boldital'), which also
+            # serves as a key in the `.formatted_fonts` dict.
+            styling = f"{'bold' * fword.bold}{'ital' * fword.ital}"
+            if styling == '':
+                styling = 'main'
+            font = self.formatted_fonts[styling]
+            word_w, word_h = self.text_draw.textsize(fword.txt, font=font)
+            word_px_dict[fword] = (word_w, word_h)
+            font_dict[fword] = font
             total_word_w += word_w
             if word_h > total_word_h:
                 total_word_h = word_h
@@ -699,18 +714,19 @@ class TextBox:
         # Deduce px available for all spaces in this line.
         px_all_spaces = w_remain - total_word_w
 
-        # De-facto width legality check (cannot be overridden):
-        if px_all_spaces < 0:
-            # Not enough room to write this text on this line.
-            return [orig_text]
-
         # Space (in px) per word boundary
-        if len(words) in [0, 1]:
+        if len(fwords) in [0, 1]:
             spwd = 0
             bonus_sp_px = 0
         else:
-            spwd = px_all_spaces // (len(words) - 1)
-            bonus_sp_px = px_all_spaces % (len(words) - 1)
+            spwd = px_all_spaces // (len(fwords) - 1)
+            bonus_sp_px = px_all_spaces % (len(fwords) - 1)
+
+        # De-facto width legality check (cannot be overridden):
+        if px_all_spaces < 0 or spwd < space_w:
+            # Not enough room to write this text on this line; or the
+            # calculated space per word is narrower than a typed space char
+            return [orig_text]
 
         # Handle legality check for height.
         is_legal = True
@@ -720,22 +736,23 @@ class TextBox:
         if not is_legal:
             return [orig_text]
 
-        # Write the indent.
+        # Write the indent (i.e. just move the cursor to the right).
         coord = getattr(self, cursor, self.text_cursor)
         coord, xy_delta = update_coord(coord, (0, 0), (indent_w, indent_h))
 
-        words_left = len(words)
-        for word in words:
+        fwords_left = len(fwords)
+        for fword in fwords:
             # Write the word
-            self.text_draw.text(coord, word, font=font, fill=font_RGBA)
+            self.text_draw.text(
+                coord, fword.txt, font=font_dict[fword], fill=font_RGBA)
 
             # We already calculated each word's width, height, so pull
             # that, and update the cursor
-            new_xy_delta = word_px_dict[word]
+            new_xy_delta = word_px_dict[fword]
             coord, xy_delta = update_coord(coord, xy_delta, new_xy_delta)
 
             # Unless it's the last word, write a space (i.e. move cursor right).
-            if words_left > 1:
+            if fwords_left > 1:
                 space = spwd
                 if bonus_sp_px > 0:
                     # Spend each extra space px, one at a time.
@@ -743,43 +760,69 @@ class TextBox:
                     bonus_sp_px -= 1
                 coord, xy_delta = update_coord(coord, xy_delta, (space, 0))
 
-            words_left -= 1
+            fwords_left -= 1
 
         self.next_line_cursor(cursor=cursor, commit=True)
         return []
 
-    def write_formatted_line(
+    def write_formatted_words(
             self, text, cursor='text_cursor', font_RGBA=None,
             reserve_last_line=False, override_legal_check=False,
-            indent=None) -> list:
-
-        from .formatting import format_parse
+            paragraph_indent=None, new_line_indent=None) -> list:
+        """
+        Write the text word-by-word, for as many words as can fit. Can
+        not use this for justified text.
+        NOTE: Will break to new lines as necessary, but will NOT update
+        the cursor to a new line after writing.
+        """
 
         fwords = format_parse(text)
 
+        def insert_new_indent(fwords_list, indent_chars=0):
+            ind_txt = FWord(' ' * paragraph_indent, bold=False, ital=False)
+            fwords_list.insert(0, ind_txt)
+            return fwords_list
+
         if reserve_last_line and self.on_last_line(cursor=cursor):
             return [text]
-
 
         if font_RGBA is None:
             font_RGBA = self.font_RGBA
 
         coord = getattr(self, cursor, 'text_cursor')
-        print(coord)
 
-        for fword in fwords:
-            print(fword.txt)
+        if paragraph_indent is not None:
+            ind_txt = FWord(' ' * paragraph_indent, bold=False, ital=False)
+            fwords.insert(0, ind_txt)
 
-        for fword in fwords:
+        consecutive_unsuccessful = 0
+        while len(fwords) > 0:
+            fword = fwords.pop(0)
             styling = f"{'bold' * fword.bold}{'ital' * fword.ital}"
-            print(styling)
             if styling == '':
                 styling = 'main'
             font = self.formatted_fonts[styling]
-            xy_delta = self._write_text(
-                coord, fword.txt, font=font, font_RGBA=font_RGBA)
-            coord = self.same_line_cursor(xy_delta, cursor=cursor, space_font=font)
-            print(coord)
+
+            legal = self._check_legal_textwrite(fword.txt, font, cursor)
+            if legal:
+                xy_delta = self._write_text(
+                    coord, fword.txt, font=font, font_RGBA=font_RGBA)
+                print(f"{coord}  :  {xy_delta}  --  {fword.txt}")
+                coord = self.same_line_cursor(
+                    xy_delta, cursor=cursor, space_font=font)
+                consecutive_unsuccessful = 0
+            else:
+                coord = self.next_line_cursor(cursor=cursor)
+                fwords.insert(0, fword)
+                consecutive_unsuccessful += 1
+
+            if consecutive_unsuccessful > 1:
+                # If we've gone two consecutive passes without a legal
+                # writing, just return the remaining list of FWord objs.
+                return fwords
+
+            if reserve_last_line and self.on_last_line(cursor=cursor):
+                return fwords
 
     @staticmethod
     def simplify_unwritten_lines(unwritten_lines) -> list:
@@ -851,7 +894,7 @@ class TextBox:
         """
 
         w, h = self.text_draw.textsize(text, font=font)
-
+        print(f"{text} -- {w}")
         # Only `legal` matters for this method.
         legal = self._check_legal_cursor((w, h), cursor=cursor)
         return legal

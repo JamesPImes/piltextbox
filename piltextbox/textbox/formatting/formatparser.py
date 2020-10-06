@@ -24,7 +24,23 @@ class FWord:
         self.ital = ital
 
 
-def format_parse(text) -> list:
+def flat_parse(text) -> list:
+    """
+    Split text into a list of FWord objects (i.e. the text of each word
+    with encoded formatting), but treat any format codes as words or
+    part of words -- i.e. '<b>the' will remain '<b>the'. Each FWord in
+    the returned list will have `False` for both its `.bold` and `.ital`
+    attributes.
+    """
+    raw_words = text.split(' ')
+    fwords = []
+    for word in raw_words:
+        fwords.append(FWord(word, bold=False, ital=False))
+
+    return fwords
+
+
+def format_parse(text, discard_formatting=False) -> list:
     """
     Split text into a list of FWord objects (i.e. the text of each word
     with encoded formatting).
@@ -83,7 +99,10 @@ def format_parse(text) -> list:
 
         # Create an FWord object for this word
         if len(txt) > 0:
-            fwords.append(FWord(txt, bold=bold, ital=ital))
+            if discard_formatting:
+                fwords.append(FWord(txt, bold=False, ital=False))
+            else:
+                fwords.append(FWord(txt, bold=bold, ital=ital))
 
         # In case no bold or ital codes were added to the respective lists...
         all_bold.append(bold)
