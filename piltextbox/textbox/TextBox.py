@@ -75,6 +75,12 @@ class TextBox:
 
         # IMPORTANT: Set font with `.set_truetype_font()` method.
         self.font = ImageFont.load_default()
+        self.formatted_fonts = {
+            'main': self.font,
+            'bold': None,
+            'ital': None,
+            'boldital': None
+        }
         self.typeface = typeface
         self.font_size = font_size
         self.font_RGBA = font_RGBA
@@ -200,7 +206,8 @@ class TextBox:
         x, y = getattr(self, cursor, self.text_cursor)
         return x == 0
 
-    def set_truetype_font(self, size=None, typeface=None, RGBA=None):
+    def set_truetype_font(
+            self, size=None, typeface=None, RGBA=None, formatting='main'):
         """
         Modify the size, typeface, and/or RGBA of the font. (Any
         unspecified parameters will leave the current attributes alone.)
@@ -214,6 +221,11 @@ class TextBox:
         However, if a truetype font was previously provided, then it
         need not be provided again.
         :param RGBA: A 4-tuple of the color for the font.
+        :param formatting: Specify what format this typeface is for
+        (must be 'main', 'bold', 'ital', or 'boldital'). Defaults to
+        'main'.
+        NOTE: Setting 'main' will ALSO set `self.font`, which is used
+        for any non-formatted writing.
         :return: None
         """
 
@@ -255,16 +267,24 @@ class TextBox:
         if size is None:
             size = self.font_size
 
-        self.font = ImageFont.truetype(typeface, size)
+        fs = ('main', 'bold', 'ital', 'boldital')
+        if formatting not in fs:
+            raise ValueError(
+                "`formatting` must be 'main', 'bold', 'ital', or 'boldital'")
 
-        # We only want to change the respective typeface attribute AFTER
-        # creating an ImageFont object, so that that has now had the
-        # chance to raise any appropriate errors.
-        self.font_size = size
-        self.typeface = typeface
+        self.formatted_fonts[formatting] = ImageFont.truetype(typeface, size)
 
-        # And recalculate how many characters we can fit in a line.
-        self.deduce_chars_per_line()
+        if formatting == 'main':
+            self.font = ImageFont.truetype(typeface, size)
+
+            # We only want to change the respective typeface attribute AFTER
+            # creating an ImageFont object, so that that has now had the
+            # chance to raise any appropriate errors.
+            self.font_size = size
+            self.typeface = typeface
+
+            # And recalculate how many characters we can fit in a line.
+            self.deduce_chars_per_line()
 
     def deduce_chars_per_line(
             self, commit=True, harder_limit=False, w_limit=None):
