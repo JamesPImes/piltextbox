@@ -19,4 +19,15 @@ tb.set_truetype_font(typeface=test_fonts['boldital'], formatting='boldital')
 #tb.set_truetype_font(typeface=test_fonts['default'], formatting='intentional_error')
 
 tb.write_paragraph('Hello, testing one two, three.\nAnd testing four, five.')
+
+import piltextbox.textbox.formatting.formatparser as parser
+f_text = "Testing <b>one,</b> <i>two,</i> <b><i>three,</b></i> four."
+fwords = parser.format_parse(f_text)
+for fw in fwords:
+    print(fw.txt)
+    print(fw.bold)
+    print(fw.ital)
+    print('\n\n')
+
+tb.write_formatted_line(f_text)
 tb.im.show()

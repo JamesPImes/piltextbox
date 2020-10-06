@@ -748,6 +748,39 @@ class TextBox:
         self.next_line_cursor(cursor=cursor, commit=True)
         return []
 
+    def write_formatted_line(
+            self, text, cursor='text_cursor', font_RGBA=None,
+            reserve_last_line=False, override_legal_check=False,
+            indent=None) -> list:
+
+        from .formatting import format_parse
+
+        fwords = format_parse(text)
+
+        if reserve_last_line and self.on_last_line(cursor=cursor):
+            return [text]
+
+
+        if font_RGBA is None:
+            font_RGBA = self.font_RGBA
+
+        coord = getattr(self, cursor, 'text_cursor')
+        print(coord)
+
+        for fword in fwords:
+            print(fword.txt)
+
+        for fword in fwords:
+            styling = f"{'bold' * fword.bold}{'ital' * fword.ital}"
+            print(styling)
+            if styling == '':
+                styling = 'main'
+            font = self.formatted_fonts[styling]
+            xy_delta = self._write_text(
+                coord, fword.txt, font=font, font_RGBA=font_RGBA)
+            coord = self.same_line_cursor(xy_delta, cursor=cursor, space_font=font)
+            print(coord)
+
     @staticmethod
     def simplify_unwritten_lines(unwritten_lines) -> list:
         """
@@ -1068,6 +1101,115 @@ class TextBox:
 
         return final_line_dicts
 
+    def _wrap_text_formatted(
+            self, text, paragraph_indent: int, new_line_indent: int):
+        """
+        INTERNAL USE:
+        Wrap the text to be written, using a more thorough algorithm,
+        which is slower but ensures that lines are as long as they can
+        be. Returns a list containing a dict for each resulting line,
+        with keys:
+            'fwords' -> A list of piltextbox.formatparser.FWord objects,
+                each being a word (i.e. a string) and the bold/ital
+                settings for that word
+            'justifiable' -> Whether the line can be justified**
+
+        **'justifiable' here means whether it can be stretched from the
+        left indent to the right edge of the textbox. (All lines will be
+        justifiable, except the final line in the text, and except lines
+        that originally ended in a linebreak or return character.)
+
+        :param paragraph_indent: How many leading spaces (i.e.
+        characters, not px) before the first line. (If not specified,
+        defaults to `self.paragraph_indent`.)
+        :param new_line_indent: How many leading spaces (i.e.
+        characters, not px) before each subsequent line. (If not
+        specified, defaults to `self.new_line_indent`.)
+        :return: A list containing a dict for each resulting line,
+        with keys:
+            'fwords' -> A list of piltextbox.formatparser.FWord objects,
+                each being a word (i.e. a string) and the bold/ital
+                settings for that word
+            'justifiable' -> Whether the line can be justified.
+        """
+        # TODO: Handle extra-long words (i.e. a single word can't fit
+        #   on a single line by itself -- just break the word at
+        #   whatever char that is, onto the next line).
+
+        def_font = self.font
+
+        final_line_dicts = []
+        max_w = self.im.width
+
+        # In order to maintain linebreaks/returns, but also have desired
+        # indents (and whether a line is justifiable), we need to
+        # manually break our text by linebreak first, and only then run
+        # the algorithm.
+
+        # First split our text by returns and linebreaks.
+        text = text.strip('\r\n')
+        text = text.replace('\r', '\n')
+        rough_lines = text.split('\n')
+
+        first_indent = ' ' * paragraph_indent
+        later_indent = ' ' * new_line_indent
+
+        # Construct lines word-by-word, until they are longer than can
+        # be printed within the width of the image. At that point,
+        # approve the last safe line, and start a new line with the word
+        # that put it over the edge.
+        # For each line, also encode whether it is 'justifiable', i.e.
+        # whether it can be stretched from the left indent to the right
+        # edge of the textbox. (All lines will be justifiable, except
+        # the final line in the text, and except lines that originally
+        # ended in a linebreak or return character.)
+        #
+        # Specifically, we constructs a list containing a dict for each
+        # line, with keys:
+        #    'txt'     -> The text of the line
+        #    'justifiable' -> Whether the line can be justified
+
+        rl_count = 0
+        for rough_line in rough_lines:
+
+            justifiable = True
+            indent = later_indent
+            if rl_count == 0:
+                indent = first_indent
+
+            # Strip any pre-existing whitespace
+            rough_line = rough_line.strip()
+            words = rough_line.split(' ')
+            if len(words) == 0:
+                # No words in this rough_line. Move on.
+                continue
+
+            current_line_to_add = indent + words.pop(0)
+            candidate_line = current_line_to_add
+            last_word_is_candidate = False
+            while len(words) > 0:
+                new_word = words.pop(0)
+                candidate_line = current_line_to_add + ' ' + new_word
+                w, h = self.text_draw.textsize(candidate_line, font=def_font)
+                if w > max_w:
+                    line_dict = {'txt': current_line_to_add,
+                                 'justifiable': justifiable}
+                    final_line_dicts.append(line_dict)
+                    indent = later_indent
+                    current_line_to_add = indent + new_word
+                    last_word_is_candidate = True
+                else:
+                    last_word_is_candidate = False
+                    current_line_to_add = candidate_line
+            if current_line_to_add == candidate_line or last_word_is_candidate:
+                justifiable = False
+                line_dict = {'txt': current_line_to_add,
+                             'justifiable': justifiable}
+                final_line_dicts.append(line_dict)
+            rl_count += 1
+
+        return final_line_dicts
+
     ################################
     # Cursor Methods
     ################################
@@ -1160,7 +1302,10 @@ class TextBox:
         x1 = x0 + x_delta + space_px
         if not prevent_linebreak and x1 >= self.im.width:
             return self.next_line_cursor(cursor=cursor, commit=commit)
-        return (x1, y0)
+        coord = (x1, y0)
+        if commit:
+            self.set_cursor(coord, cursor=cursor)
+        return coord
 
     def next_line_cursor(self, cursor='text_cursor', commit=True) -> tuple:
         """
