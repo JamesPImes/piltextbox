@@ -6,7 +6,15 @@ and methods for configuring and writing text.
 """
 
 from PIL import Image, ImageDraw, ImageFont
-from .formatting import format_parse, flat_parse, FWord
+from .formatting import FWord, FLine, PLine, UnwrittenLines
+from .formatting import format_parse, flat_parse
+
+# TODO: Replace all text_wrap methods with `._text_wrap_TESTING()`
+#   (and rename it).
+# TODO: Pare down all writing methods to only those that serve unique
+#   functionality.
+# TODO: The paragraph-writing methods should take an UnwrittenLines obj.
+# TODO: The line-writing methods should take list of PLine/FLine objs (I think?)
 
 class TextBox:
     """
@@ -389,8 +397,8 @@ class TextBox:
     def write_paragraph(
             self, text='', cursor='text_cursor', font_RGBA=None,
             reserve_last_line=False, override_legal_check=False,
-            paragraph_indent=None, new_line_indent=None,
-            wrap_method='thorough', justify=False, continue_lines=None) -> list:
+            paragraph_indent=None, new_line_indent=None, justify=False,
+            formatting=False, discard_formatting=False):
         """
         Write the text as though it is a paragraph, with linebreaks
         inserted where necessary. Any lines that could not be fit within
@@ -398,7 +406,8 @@ class TextBox:
         use the `.continue_writing()` method to write these lines into a
         new TextBox object, configured with identical font and width.)
 
-        :param text: Text to be written (a string).
+        :param text: Text to be written (a string), or an UnwrittenLines
+        object.
         :param cursor: Which cursor to begin writing at.
         :param font_RGBA: A 4-tuple specifying the font color. (If not
         specified, will fall back on whatever is in this object's
@@ -415,8 +424,6 @@ class TextBox:
         :param new_line_indent: How many leading spaces (i.e.
         characters, not px) before each subsequent line. (If not
         specified, defaults to `self.new_line_indent`.)
-        :param wrap_method: 'thorough' (the default) or 'quick'.
-        (Thorough maximizes line length, but takes longer.)
         :param justify: A bool, whether the written text should be
         justified -- i.e. stretched between the left indent and the
         right edge of the textbox. If used, all lines in the paragraph
@@ -445,49 +452,44 @@ class TextBox:
 
         # Check if text has already been broken into lines (e.g., if this
         # was called from `.continue_paragraph()` method.)
-        already_lines = continue_lines is not None
-
-        if already_lines:
-            self._paragraph_lines_error_check(continue_lines)
-            lines = continue_lines
-        else:
-            # Break text into lines (actually a list of dicts)
-            if wrap_method == 'quick':
-                lines = self._wrap_text(
-                    text, paragraph_indent=paragraph_indent,
-                    new_line_indent=new_line_indent)
-            elif wrap_method == 'thorough':
-                lines = self._wrap_text_thorough(
-                    text, paragraph_indent=paragraph_indent,
-                    new_line_indent=new_line_indent)
-
-            else:
-                raise ValueError(
-                    "`wrap_method` must be either 'quick' or 'thorough'. "
-                    f"Argument passed: {wrap_method}")
+        if not isinstance(text, UnwrittenLines):
+            # Break text into lines (i.e. an UnwrittenLines object)
+            text = self._wrap_text_TESTING(
+                text, paragraph_indent=paragraph_indent,
+                new_line_indent=new_line_indent, formatting=formatting,
+                discard_formatting=discard_formatting)
 
         attempt = 1
 
         # Write each line (until we can't anymore)
-        while len(lines) > 0:
+        while text.remaining > 0:
             if reserve_last_line and self.on_last_line(cursor=cursor):
-                return lines
+                return text
             attempt += 1
-            line = lines.pop(0)
+            line = text._stage_next_line()
 
             # Write the line. Store the resulting list, to see if everything
             # got written.
-            unwrit_line = self.write_line(
-                line, cursor=cursor, font_RGBA=font_RGBA, indent=None,
-                reserve_last_line=reserve_last_line,
-                override_legal_check=override_legal_check, justify=justify)
+            if justify:
+                unwrit_line = self.write_justified_line(
+                    text=line, cursor=cursor, font_RGBA=font_RGBA,
+                    reserve_last_line=reserve_last_line,
+                    override_legal_check=override_legal_check, indent=0,
+                    formatting=formatting)
+            else:
+                unwrit_line = self.write_line(
+                    line, cursor=cursor, font_RGBA=font_RGBA, indent=None,
+                    reserve_last_line=reserve_last_line,
+                    override_legal_check=override_legal_check, justify=justify)
 
             if unwrit_line != []:
                 # Something couldn't be written. Put the last line back
                 # in and return.
-                return [line] + lines
+                text._unstage()
+                return text
+            text._successful_write()
 
-        return lines
+        return text
 
     def write_line(
             self, text, cursor='text_cursor', font_RGBA=None,
@@ -686,7 +688,12 @@ class TextBox:
         # The number of pixels we have available to write all words:
         w_remain = self.im.width - indent_w
 
-        if formatting:
+        if isinstance(text, FLine):
+            fwords = text.fwords
+        elif isinstance(text, PLine):
+            fwords = flat_parse(text.txt)
+        # Otherwise, we assume it's a string
+        elif formatting:
             fwords = format_parse(text)
         else:
             fwords = flat_parse(text)
@@ -788,7 +795,7 @@ class TextBox:
             if indent_chars in [None, 0]:
                 return
             ind_txt = FWord(
-                ' ' * paragraph_indent, bold=False, ital=False, space=False)
+                ' ' * paragraph_indent, bold=False, ital=False, xspace=False)
             fwords_list.insert(0, ind_txt)
             return
 
@@ -816,7 +823,7 @@ class TextBox:
                 xy_delta = self._write_text(
                     coord, fword.txt, font=font, font_RGBA=font_RGBA)
                 coord = self.same_line_cursor(
-                    xy_delta, cursor=cursor, add_space=fword.space,
+                    xy_delta, cursor=cursor, add_space=fword.xspace,
                     space_font=font)
                 consecutive_unsuccessful = 0
             else:
@@ -1152,9 +1159,9 @@ class TextBox:
 
         return final_line_dicts
 
-    def _wrap_text_formatted(
+    def _wrap_text_TESTING(
             self, text, paragraph_indent: int, new_line_indent: int,
-            discard_formatting=False):
+            formatting=False, discard_formatting=False):
         """
         INTERNAL USE:
         Equivalent to `._wrap_text_thorough()`, but compiles each line
@@ -1164,17 +1171,11 @@ class TextBox:
 
         Wrap the text to be written, using a more thorough algorithm,
         which is slower but ensures that lines are as long as they can
-        be. Returns a list containing a dict for each resulting line,
-        with keys:
-            'fwords' -> A list of piltextbox.formatparser.FWord objects,
-                each being a word (i.e. a string) and the bold/ital
-                settings for that word
-            'justifiable' -> Whether the line can be justified**
+        be. Returns an UnwrittenLines object.
 
-        **'justifiable' here means whether it can be stretched from the
-        left indent to the right edge of the textbox. (All lines will be
-        justifiable, except the final line in the text, and except lines
-        that originally ended in a linebreak or return character.)
+        Note: All lines will be justifiable, except the final line in
+        the text, and except lines that originally ended in a linebreak
+        or return character.
 
         :param paragraph_indent: How many leading spaces (i.e.
         characters, not px) before the first line. (If not specified,
@@ -1182,12 +1183,14 @@ class TextBox:
         :param new_line_indent: How many leading spaces (i.e.
         characters, not px) before each subsequent line. (If not
         specified, defaults to `self.new_line_indent`.)
-        :return: A list containing a dict for each resulting line,
-        with keys:
-            'fwords' -> A list of piltextbox.formatparser.FWord objects,
-                each being a word (i.e. a string) and the bold/ital
-                settings for that word
-            'justifiable' -> Whether the line can be justified.
+        :param formatting: A bool, whether or not to parse format codes
+        in the input text. Defaults to False.
+        :param discard_formatting: A bool, whether or not to flatten all
+        formatting (if any) into the default styling. (Has no effect if
+        `formatting==False`.) Defaults to False.
+        :return: An UnwrittenLines object containing a list of PLine or
+        FLine objects (depending on whether parameter `formatting=` was
+        passed as False or True).
         """
         # TODO: Handle extra-long words (i.e. a single word can't fit
         #   on a single line by itself -- just break the word at
@@ -1196,6 +1199,7 @@ class TextBox:
         def_font = self.font
 
         final_line_dicts = []
+        final_lines = UnwrittenLines(lines=None, formatting=formatting)
         max_w = self.im.width
 
         # In order to maintain linebreaks/returns, but also have desired
@@ -1209,9 +1213,9 @@ class TextBox:
         rough_lines = text.split('\n')
 
         first_indent = FWord(
-            ' ' * paragraph_indent, bold=False, ital=False, space=False)
+            ' ' * paragraph_indent, bold=False, ital=False, xspace=False)
         later_indent = FWord(
-            ' ' * new_line_indent, bold=False, ital=False, space=False)
+            ' ' * new_line_indent, bold=False, ital=False, xspace=False)
 
         # Construct lines word-by-word, until they are longer than can
         # be printed within the width of the image. At that point,
@@ -1238,8 +1242,12 @@ class TextBox:
 
             # Strip any pre-existing whitespace
             rough_line = rough_line.strip()
-            fwords = format_parse(
-                rough_line, discard_formatting=discard_formatting)
+
+            if formatting:
+                fwords = format_parse(
+                    rough_line, discard_formatting=discard_formatting)
+            else:
+                fwords = flat_parse(rough_line)
 
             if len(fwords) == 0:
                 # No words in this rough_line. Move on.
@@ -1289,9 +1297,19 @@ class TextBox:
                 w, h = word_px_dict[new_fword]
                 cand_w += w + space_w
                 if cand_w > max_w:
-                    line_dict = {'fwords': current_line_to_add,
-                                 'justifiable': justifiable}
-                    final_line_dicts.append(line_dict)
+                    line_dict = {'fwords': current_line_to_add,  # DISCARD
+                                 'justifiable': justifiable}     # DISCARD
+
+                    # Create a new FLine.
+                    nl = FLine(
+                        fwords=current_line_to_add, justifiable=justifiable)
+                    # If we don't want formatting, convert the FLine to PLine.
+                    if not formatting:
+                        nl = nl.to_pline()
+
+                    # Append our new line, and start a new one
+                    final_lines.lines.append(nl)
+                    final_line_dicts.append(line_dict)          # DISCARD
                     indent = later_indent
                     current_line_to_add = [indent, new_fword]
                     last_word_is_candidate = True
@@ -1307,17 +1325,28 @@ class TextBox:
                     # char), but wait until after the legal check so that a
                     # space at the end of a line does not push it over the max_w
                     # and incorrectly cause it to be illegal.
-                    # And multiplying it by `new_fword.space` (a bool) prevents
+                    # And multiplying it by `new_fword.xspace` (a bool) prevents
                     # an extraneous space after indent (for example).
-                    cur_w = cand_w + space_w * new_fword.space
+                    cur_w = cand_w + space_w * new_fword.xspace
             if current_line_to_add == candidate_line_list or last_word_is_candidate:
                 justifiable = False
-                line_dict = {'fwords': current_line_to_add,
-                             'justifiable': justifiable}
-                final_line_dicts.append(line_dict)
+
+                # Create a new FLine.
+                nl = FLine(
+                    fwords=current_line_to_add, justifiable=justifiable)
+                # If we don't want formatting, convert the FLine to PLine.
+                if not formatting:
+                    nl = nl.to_pline()
+                # Append our new line
+                final_lines.lines.append(nl)
+
+                line_dict = {'fwords': current_line_to_add,     # DISCARD
+                             'justifiable': justifiable}        # DISCARD
+                final_line_dicts.append(line_dict)              # DISCARD
             rl_count += 1
 
-        return final_line_dicts
+        #return final_line_dicts
+        return final_lines
 
     ################################
     # Cursor Methods
