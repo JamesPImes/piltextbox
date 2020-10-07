@@ -106,6 +106,9 @@ class UnwrittenLines:
             lines = []
         self.lines = lines
 
+        # For staging the next line to write, while writing is being attempted.
+        self.staged = None
+
         if formatting is None:
             if not isinstance(lines, list):
                 pass
@@ -138,6 +141,45 @@ class UnwrittenLines:
         sl = self.simplify()
         for l in sl:
             print(l)
+
+    @property
+    def remaining(self):
+        """
+        How many lines remain.
+        """
+        if self.lines is None:
+            return None
+        return len(self.lines)
+
+    def _stage_next_line(self):
+        """
+        INTERNAL USE:
+        Stage the next line for writing, and return that line.
+        (Use only while writing is being attempted.)
+        """
+        if self.lines is None:
+            return None
+        if len(self.lines) == 0:
+            return None
+        self.staged = self.lines[0]
+        return self.staged
+
+    def _successful_write(self):
+        """
+        INTERNAL USE:
+        The staged line was successfully written. Remove it, and reset
+        the staged line to None.
+        """
+        self.staged = None
+        self.lines.pop(0)
+
+    def _unstage(self):
+        """
+        INTERNAL USE:
+        The staged line was NOT successfully written. Put the line back
+        in the list (i.e. just set `.staged` to None).
+        """
+        self.staged = None
 
 def flat_parse(text) -> list:
     """
