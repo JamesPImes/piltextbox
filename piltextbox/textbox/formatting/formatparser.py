@@ -15,8 +15,8 @@ outside of any punctuation).
 
 class FWord:
     """
-    The text of a word, and whether or not it should be bolded and/or
-    italicized.
+    The text of a word, whether or not it should be bolded and/or
+    italicized, and whether it should be followed by a space.
     """
     def __init__(self, txt, bold=False, ital=False, space=True):
         """
@@ -32,6 +32,35 @@ class FWord:
         self.ital = ital
         self.space = space
 
+
+class FLine:
+    """
+    A line of formatted text.
+    """
+    def __init__(self, fwords: list, justifiable=False):
+        """
+
+        :param fwords: A list of FWord objects that make up the line of
+        text.
+        :param justifiable: A bool, whether or not this line can be
+        block-justified.
+        """
+        self.fwords = fwords
+        self.justifiable = justifiable
+
+    def simplify(self):
+        """
+        Return the text of this line in plain text (a string).
+        """
+        c_txt = ''
+        for i in range(len(self.fwords)):
+            sp = ''
+            if i != len(self.fwords) - 1:
+                # Don't add a final space for the last wword in the list
+                sp = self.fwords[i].space * ' '
+            c_txt = f"{c_txt}{self.fwords[i].txt}{sp}"
+
+        return c_txt
 
 def flat_parse(text) -> list:
     """
