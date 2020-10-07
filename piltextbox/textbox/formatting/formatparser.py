@@ -18,19 +18,19 @@ class FWord:
     The text of a word, whether or not it should be bolded and/or
     italicized, and whether it should be followed by a space.
     """
-    def __init__(self, txt, bold=False, ital=False, space=True):
+    def __init__(self, txt, bold=False, ital=False, xspace=True):
         """
         :param txt: A string, being the word itself.
         :param bold: A bool, whether to bold this word.
         :param ital: A bool, whether to italicize this word.
-        :param space: A bool, whether a space may follow this word.
+        :param xspace: A bool, whether a space may follow this word.
         Defaults to True; set to False for indents and perhaps
         punctuation.
         """
         self.txt = txt
         self.bold = bold
         self.ital = ital
-        self.space = space
+        self.xspace = xspace
 
 
 class FLine:
@@ -56,11 +56,19 @@ class FLine:
         for i in range(len(self.fwords)):
             sp = ''
             if i != len(self.fwords) - 1:
-                # Don't add a final space for the last wword in the list
-                sp = self.fwords[i].space * ' '
+                # Don't add a final space for the last fword in the list
+                sp = self.fwords[i].xspace * ' '
             c_txt = f"{c_txt}{self.fwords[i].txt}{sp}"
 
         return c_txt
+
+    def to_pline(self):
+        """
+        Convert this FLine object (formatted text) into a PLine object
+        (plain text), discarding any encoded formatting, but retaining
+        whether it is justifiable.
+        """
+        return PLine(txt=self.simplify(), justifiable=self.justifiable)
 
 
 class PLine:
@@ -82,20 +90,54 @@ class UnwrittenLines:
     A container for unwritten lines, either formatted or plain (but not
     both types).
     """
-    def __init__(self, lines: list):
+    def __init__(self, lines=None, formatting=None):
         """
         :param lines: A list of PLine objects or a list of FLine objects
         (but not a mixture of the two) -- i.e. either unwritten plain
-        lines, or unwritten formatted lines.
+        lines, or unwritten formatted lines. If not specified, defaults
+        to an empty list.
+        :param formatting: A bool, whether or not the objects are FLine
+        (i.e. `=True`; for formatted lines) or PLine (i.e. `=False`; for
+        plain lines). If passed as None (the default), will check the
+        type of the first element in the `lines` list (if any). (It may
+        remain None.)
         """
+        if lines is None:
+            lines = []
         self.lines = lines
-        if len(lines) == 0:
-            self.formatted = None
-        elif isinstance(lines[0], PLine):
-            self.formatted = False
-        else:
-            self.formatted = True
 
+        if formatting is None:
+            if not isinstance(lines, list):
+                pass
+            elif len(lines) == 0:
+                pass
+            elif isinstance(lines[0], PLine):
+                formatting = False
+            elif isinstance(lines[0], FLine):
+                formatting = True
+        self.formatting = formatting
+
+    def simplify(self):
+        """
+        Convert this UnwrittenLines object into a list of lines of text
+        (i.e. strings), without any encoded formatting information.
+        """
+        simplified_lines = []
+        if self.formatting:
+            for obj in self.lines:
+                simplified_lines.append(obj.simplify())
+        else:
+            for obj in self.lines:
+                simplified_lines.append(obj.txt)
+        return simplified_lines
+
+    def print(self):
+        """
+        Print the plain text of this UnwrittenLines to console.
+        """
+        sl = self.simplify()
+        for l in sl:
+            print(l)
 
 def flat_parse(text) -> list:
     """
