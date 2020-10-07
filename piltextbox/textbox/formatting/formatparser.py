@@ -62,6 +62,41 @@ class FLine:
 
         return c_txt
 
+
+class PLine:
+    """
+    A line of plain text.
+    """
+    def __init__(self, txt, justifiable=False):
+        """
+        :param txt: A line of text (i.e. a single string).
+        :param justifiable: A bool, whether or not this line can be
+        block-justified.
+        """
+        self.txt = txt
+        self.justifiable = justifiable
+
+
+class UnwrittenLines:
+    """
+    A container for unwritten lines, either formatted or plain (but not
+    both types).
+    """
+    def __init__(self, lines: list):
+        """
+        :param lines: A list of PLine objects or a list of FLine objects
+        (but not a mixture of the two) -- i.e. either unwritten plain
+        lines, or unwritten formatted lines.
+        """
+        self.lines = lines
+        if len(lines) == 0:
+            self.formatted = None
+        elif isinstance(lines[0], PLine):
+            self.formatted = False
+        else:
+            self.formatted = True
+
+
 def flat_parse(text) -> list:
     """
     Split text into a list of FWord objects (i.e. the text of each word
