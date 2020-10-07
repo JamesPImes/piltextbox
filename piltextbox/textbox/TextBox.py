@@ -776,12 +776,21 @@ class TextBox:
         the cursor to a new line after writing.
         """
 
+        if paragraph_indent is None:
+            paragraph_indent = self.paragraph_indent
+
+        if new_line_indent is None:
+            new_line_indent = self.new_line_indent
+
         fwords = format_parse(text)
 
-        def insert_new_indent(fwords_list, indent_chars=0):
-            ind_txt = FWord(' ' * paragraph_indent, bold=False, ital=False)
+        def insert_new_indent(fwords_list, indent_chars):
+            if indent_chars in [None, 0]:
+                return
+            ind_txt = FWord(
+                ' ' * paragraph_indent, bold=False, ital=False, space=False)
             fwords_list.insert(0, ind_txt)
-            return fwords_list
+            return
 
         if reserve_last_line and self.on_last_line(cursor=cursor):
             return [text]
@@ -791,9 +800,8 @@ class TextBox:
 
         coord = getattr(self, cursor, 'text_cursor')
 
-        if paragraph_indent is not None:
-            ind_txt = FWord(' ' * paragraph_indent, bold=False, ital=False)
-            fwords.insert(0, ind_txt)
+        # Insert the initial indent (if any) at the start of the list.
+        insert_new_indent(fwords, paragraph_indent)
 
         consecutive_unsuccessful = 0
         while len(fwords) > 0:
@@ -807,13 +815,14 @@ class TextBox:
             if legal:
                 xy_delta = self._write_text(
                     coord, fword.txt, font=font, font_RGBA=font_RGBA)
-                print(f"{coord}  :  {xy_delta}  --  {fword.txt}")
                 coord = self.same_line_cursor(
-                    xy_delta, cursor=cursor, space_font=font)
+                    xy_delta, cursor=cursor, add_space=fword.space,
+                    space_font=font)
                 consecutive_unsuccessful = 0
             else:
                 coord = self.next_line_cursor(cursor=cursor)
                 fwords.insert(0, fword)
+                insert_new_indent(fwords, new_line_indent)
                 consecutive_unsuccessful += 1
 
             if consecutive_unsuccessful > 1:
@@ -894,7 +903,6 @@ class TextBox:
         """
 
         w, h = self.text_draw.textsize(text, font=font)
-        print(f"{text} -- {w}")
         # Only `legal` matters for this method.
         legal = self._check_legal_cursor((w, h), cursor=cursor)
         return legal
@@ -1145,9 +1153,15 @@ class TextBox:
         return final_line_dicts
 
     def _wrap_text_formatted(
-            self, text, paragraph_indent: int, new_line_indent: int):
+            self, text, paragraph_indent: int, new_line_indent: int,
+            discard_formatting=False):
         """
         INTERNAL USE:
+        Equivalent to `._wrap_text_thorough()`, but compiles each line
+        as a list of FWord objects (rather than as a string) to account
+        for format codes in the input `text`. Suppress the formatting
+        with `discard_formatting=True` (`False` by default).
+
         Wrap the text to be written, using a more thorough algorithm,
         which is slower but ensures that lines are as long as they can
         be. Returns a list containing a dict for each resulting line,
@@ -1194,8 +1208,10 @@ class TextBox:
         text = text.replace('\r', '\n')
         rough_lines = text.split('\n')
 
-        first_indent = ' ' * paragraph_indent
-        later_indent = ' ' * new_line_indent
+        first_indent = FWord(
+            ' ' * paragraph_indent, bold=False, ital=False, space=False)
+        later_indent = FWord(
+            ' ' * new_line_indent, bold=False, ital=False, space=False)
 
         # Construct lines word-by-word, until they are longer than can
         # be printed within the width of the image. At that point,
@@ -1222,31 +1238,81 @@ class TextBox:
 
             # Strip any pre-existing whitespace
             rough_line = rough_line.strip()
-            words = rough_line.split(' ')
-            if len(words) == 0:
+            fwords = format_parse(
+                rough_line, discard_formatting=discard_formatting)
+
+            if len(fwords) == 0:
                 # No words in this rough_line. Move on.
                 continue
 
-            current_line_to_add = indent + words.pop(0)
-            candidate_line = current_line_to_add
+            # Get the width, height (in px) of each word, and the total for
+            # all words; also get the font typeface
+            word_px_dict = {}
+            total_word_w = 0
+            total_word_h = 0
+            font_dict = {}
+            for fword in fwords + [first_indent, later_indent]:
+                # Get the styling for this word (e.g., 'boldital'), which also
+                # serves as a key in the `.formatted_fonts` dict.
+                styling = f"{'bold' * fword.bold}{'ital' * fword.ital}"
+                if styling == '':
+                    styling = 'main'
+                font = self.formatted_fonts[styling]
+                word_w, word_h = self.text_draw.textsize(fword.txt, font=font)
+                word_px_dict[fword] = (word_w, word_h)
+                font_dict[fword] = font
+                total_word_w += word_w
+                if word_h > total_word_h:
+                    total_word_h = word_h
+
+            # Get the width of a single space character in px
+            space_w, _ = self.text_draw.textsize(' ', font=def_font)
+
+            # width in px of current line
+            cur_w = 0
+
+            current_line_to_add = [indent, fwords.pop(0)]
+
+            for fword in current_line_to_add:
+                cur_w += word_px_dict[fword][0]
+
+            candidate_line_list = current_line_to_add.copy()
             last_word_is_candidate = False
-            while len(words) > 0:
-                new_word = words.pop(0)
-                candidate_line = current_line_to_add + ' ' + new_word
-                w, h = self.text_draw.textsize(candidate_line, font=def_font)
-                if w > max_w:
-                    line_dict = {'txt': current_line_to_add,
+            while len(fwords) > 0:
+                # width in px of candidate line
+                cand_w = cur_w
+
+                new_fword = fwords.pop(0)
+                candidate_line_list = current_line_to_add.copy()
+                candidate_line_list.append(new_fword)
+
+                w, h = word_px_dict[new_fword]
+                cand_w += w + space_w
+                if cand_w > max_w:
+                    line_dict = {'fwords': current_line_to_add,
                                  'justifiable': justifiable}
                     final_line_dicts.append(line_dict)
                     indent = later_indent
-                    current_line_to_add = indent + new_word
+                    current_line_to_add = [indent, new_fword]
                     last_word_is_candidate = True
+
+                    # Reset cur_w to 0, plus width of indent and first word
+                    cur_w = 0
+                    for fword in current_line_to_add:
+                        cur_w += word_px_dict[fword][0]
                 else:
                     last_word_is_candidate = False
-                    current_line_to_add = candidate_line
-            if current_line_to_add == candidate_line or last_word_is_candidate:
+                    current_line_to_add = candidate_line_list
+                    # We also add `space_w` (equivalent to an additional space
+                    # char), but wait until after the legal check so that a
+                    # space at the end of a line does not push it over the max_w
+                    # and incorrectly cause it to be illegal.
+                    # And multiplying it by `new_fword.space` (a bool) prevents
+                    # an extraneous space after indent (for example).
+                    cur_w = cand_w + space_w * new_fword.space
+            if current_line_to_add == candidate_line_list or last_word_is_candidate:
                 justifiable = False
-                line_dict = {'txt': current_line_to_add,
+                line_dict = {'fwords': current_line_to_add,
                              'justifiable': justifiable}
                 final_line_dicts.append(line_dict)
             rl_count += 1

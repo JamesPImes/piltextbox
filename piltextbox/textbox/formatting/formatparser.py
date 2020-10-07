@@ -18,10 +18,19 @@ class FWord:
     The text of a word, and whether or not it should be bolded and/or
     italicized.
     """
-    def __init__(self, txt, bold=False, ital=False):
+    def __init__(self, txt, bold=False, ital=False, space=True):
+        """
+        :param txt: A string, being the word itself.
+        :param bold: A bool, whether to bold this word.
+        :param ital: A bool, whether to italicize this word.
+        :param space: A bool, whether a space may follow this word.
+        Defaults to True; set to False for indents and perhaps
+        punctuation.
+        """
         self.txt = txt
         self.bold = bold
         self.ital = ital
+        self.space = space
 
 
 def flat_parse(text) -> list:
