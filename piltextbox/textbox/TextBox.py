@@ -7,7 +7,7 @@ and methods for configuring and writing text.
 
 from PIL import Image, ImageDraw, ImageFont
 from .formatting import FWord, FLine, PLine, UnwrittenLines
-from .formatting import format_parse, flat_parse
+from .formatting import format_parse, flat_parse, all_parse, parse_into_line
 
 # TODO: Replace all text_wrap methods with `._text_wrap_TESTING()`
 #   (and rename it).
@@ -429,12 +429,16 @@ class TextBox:
         right edge of the textbox. If used, all lines in the paragraph
         will be justified, except the final line, and any line that ends
         with a linebreak or return character. (Defaults to `False`)
-        :param continue_lines: Continue writing lines that were returned
-        as unwritten by a previous call of `.write_paragraph()`.
         IMPORTANT: If `continue_lines` is specified, then `text` is
         completely ignored. The lines will not be re-wrapped, and it is
         assumed that this TextBox object is identical in configuration
         to the TextBox object that returned the lines as unwritten.
+        :param formatting: A bool, whether to parse format codes (e.g.,
+        '<b>' or '</b>' in the input text.
+        :param discard_formatting: A bool, whether to discard all
+        formatting and only write plain text. (Will have no effect
+        unless parameter `formatting=` is True. Will ALSO have no effect
+        if the text has already been word-wrapped.)
         :return: Returns a list of the lines that could NOT be written.
         """
 
@@ -494,7 +498,8 @@ class TextBox:
     def write_line(
             self, text, cursor='text_cursor', font_RGBA=None,
             reserve_last_line=False, override_legal_check=False,
-            indent=None, justify=False) -> list:
+            indent=None, justify=False, formatting=False,
+            discard_formatting=False):
         """
         Write a line of text at the specified cursor, after first
         confirming that the line can fit within the textbox. (May
@@ -508,10 +513,10 @@ class TextBox:
             'justifiable' -> A bool, whether the text is justifiable.
 
         If a string is passed as parameter `text`, then parameter
-        `justify=True` will justify the line. However, if a 2-key dict
-        is passed as `text` (as discussed below), then both `justify`
-        parameter must be True, AND 'justifiable' must be set to True in
-        the dict as well -- or the line will NOT be justified.
+        `justify=True` will justify the line. However, if a PLine or
+        FLine object is passed as `text` (as discussed below), then BOTH
+        `justify=` parameter must be True, AND that obj's `.justifiable`
+        attribute must be True -- or the line will NOT be justified.
             ex:
                 # Will justify the line (passed a str-type):
                 line_1 = 'Testing Ex 1'
@@ -522,59 +527,60 @@ class TextBox:
                 tb_obj.write_line(line_2, justify=False)
 
                 # Will justify the line:
-                line_3 = {'txt': 'Testing Ex 3', 'justifiable' = True}
+                line_3 = PLine(txt='Testing Ex 3', justifiable=True)
                 tb_obj.write_line(line_3, justify=True)
 
                 # Will NOT justify the line:
-                line_4 = {'txt': 'Testing Ex 4', 'justifiable' = False}
+                line_4 = PLine(txt='Testing Ex 4', justifiable=False)
                 tb_obj.write_line(line_4, justify=True)
 
                 # Will NOT justify the line:
-                line_5 = {'txt': 'Testing Ex 5', 'justifiable' = True}
+                line_5 = PLine(txt='Testing Ex 5', justifiable=True)
                 tb_obj.write_line(line_5, justify=False)
 
-        :param text: The text to write (a string).
-        NOTE: May optionally pass a dict containing these two keys:
-            'txt' -> The text to write (a string);
-            'justifiable' -> A bool, whether the text is justifiable.
-            ('justifiable' has no effect in this method. Instead, use
-            `.write_justified_line()` if that is desired.)
+                # (FLine objects are equivalent to PLine objects in this
+                # regard.)
+
+        :param text: The text to write (a string), or a PLine or FLine
+        object.
         :param indent: An int specifying how many leading spaces (i.e.
         characters, not px) to write before the `text`.
         (Defaults to None)
-        :return: Returns a list of the text that was NOT written (i.e.
-        either an empty list, or a single-element list containing the
-        original text -- to mirror the `.write_paragraph()` method).
-        IMPORTANT: If a 2-key dict was passed as `text` (as discussed
-        above) and could not be written, a list containing that dict is
-        returned.
+        :return: Returns as follows:
+        -- Line successfully written -> returns None
+        -- Line unsuccessfully written, and param `formatting` was False
+            -> returns a PLine object, being the unwritten line.
+        -- Line unsuccessfully written, and param `formatting` was True
+            -> returns a FLine object, being the unwritten line, with
+                encoded formatting.
+        NOTE: Parameter `formatting` is ignored if a PLine or FLine obj
+        was passed originally, and if it was not written, the original
+        PLine or FLine will be returned (i.e. it will not convert a
+        PLine to an FLine, or vice versa, regardless of `formatting=`).
         """
 
+        # TODO: Better error message here:
         bad_text_error = TypeError(
-            'Must pass `text` as str (or a dict containing 2 keys, with '
-            'value-types as follows: \'txt\' -> str; \'justify\' -> bool'
+            'Must pass `text` as str (or a FLine or PLine object)'
         )
 
-        orig_text = text
-
-        if reserve_last_line and self.on_last_line(cursor=cursor):
-            return [orig_text]
-
-        # Check whether `text` is a plain string, or if it was passed as
-        # a dict (with appropriate 'txt' and 'justifiable' keys). Unpack
-        # as needed.
+        # Check whether `text` is a plain string; convert to PLine or
+        # FLine, as needed
         if isinstance(text, str):
             justifiable = True
-        elif isinstance(text, dict):
-            try:
-                justifiable = text['justifiable']
-                if not isinstance(justifiable, bool):
-                    raise bad_text_error
-                text = text['txt']
-            except KeyError:
-                raise bad_text_error
+            text = parse_into_line(
+                text, formatting, justifiable, discard_formatting)
+        elif isinstance(text, PLine):
+            justifiable = text.justifiable
+            formatting = False
+        elif isinstance(text, FLine):
+            justifiable = text.justifiable
+            formatting = True
         else:
             raise bad_text_error
+
+        if reserve_last_line and self.on_last_line(cursor=cursor):
+            return text
 
         if justify and justifiable:
             # If the line must be justified, pass everything on to the
@@ -589,30 +595,174 @@ class TextBox:
             if unwrit_line == []:
                 return unwrit_line
             else:
-                return [orig_text]
+                return text
 
         font = self.font
-
-        indented_text = text
-        if indent is not None:
-            indented_text = f"{' ' * indent}{text}"
 
         if font_RGBA is None:
             font_RGBA = self.font_RGBA
 
+        if formatting:
+            # TODO: def write_fline()...
+            pass
+        else:
+            return self._write_pline(
+                text, cursor, font, font_RGBA, override_legal_check, indent)
+
+    def _write_pline(
+            self, pline_obj: PLine, cursor, font, font_RGBA,
+            override_legal_check=False, indent=None):
+
+        # Convert `integer` from number of spaces (int) into a string of spaces
+        if indent is not None:
+            indent = ' ' * indent
+        staged_line = pline_obj._stage(indent=indent)
+
         # Try to get the specified cursor, but fall back to
         # `.text_cursor`, if it doesn't exist
         coord = getattr(self, cursor, self.text_cursor)
-        legal = self._check_legal_textwrite(indented_text, font, cursor)
+        legal = self._check_legal_textwrite(staged_line, font, cursor)
         if legal or override_legal_check:
             # Write the text and get the width and height of the text written.
-            xy_delta = self._write_text(coord, indented_text, font, font_RGBA)
+            xy_delta = self._write_text(coord, staged_line, font, font_RGBA)
         else:
-            return [text]
+            pline_obj._unstage()
+            return pline_obj
 
         self.next_line_cursor(cursor=cursor, commit=True)
 
-        return []
+        return None
+
+    def _write_fline(
+            self, fline_obj: FLine, cursor, font_RGBA,
+            override_legal_check=False, indent=None, justify=False,
+            fword_info=None):
+        """
+
+        :param indent: An integer, being the number of space characters
+        to use for the indentation of this line.
+        :param fword_info: A dict generated by `FWord._examine_fwords()`
+        specifying size, etc. of FWord objects. (Probably only for
+        internal use, when calling this method after text has been
+        wrapped, wherein this information has already been calculated
+        -- e.g., when this method is called from `.write_paragraph()`.)
+        """
+
+        def update_coord(coord, xy_delta, new_xy_delta) -> tuple:
+            """
+            Update the coord and xy_delta, per new_xy_delta.
+            """
+
+            x0, y0 = coord
+            x_delta, y_delta = xy_delta
+            new_x_delta, new_y_delta = new_xy_delta
+
+            coord = (x0 + new_x_delta, y0)
+
+            if new_y_delta > y_delta:
+                y_delta = new_y_delta
+
+            x_delta += new_x_delta
+
+            xy_delta = (x_delta, y_delta)
+
+            return coord, xy_delta
+
+        # TODO: Delete after testing:
+        font_RGBA = self.font_RGBA
+
+        # Convert `integer` from number of spaces (int) into a string of spaces
+        if indent is not None:
+            indent = ' ' * indent
+
+        fwords = fline_obj._stage(indent=indent)
+
+        if fword_info is None:
+            fword_info = FWord._examine_fwords(
+                fwords, fonts=self.formatted_fonts)
+        line_info = fline_obj._extract_fword_info(fword_info, use_staged=True)
+
+        # # Get the width, height (in px) of each word, and the total for
+        # # all words; also get the font typeface
+        # word_px_dict = {}
+        # total_word_w = 0
+        # total_word_h = 0
+        # font_dict = {}
+        # for fword in fwords:
+        #     # Get the styling for this word (e.g., 'boldital'), which also
+        #     # serves as a key in the `.formatted_fonts` dict.
+        #     styling = f"{'bold' * fword.bold}{'ital' * fword.ital}"
+        #     if styling == '':
+        #         styling = 'main'
+        #     font = self.formatted_fonts[styling]
+        #     word_w, word_h = self.text_draw.textsize(fword.txt, font=font)
+        #     word_px_dict[fword] = (word_w, word_h)
+        #     font_dict[fword] = font
+        #     total_word_w += word_w
+        #     if word_h > total_word_h:
+        #         total_word_h = word_h
+
+        # Deduce px available for all spaces in this line.
+        px_all_spaces = self.im.width - line_info['line_word_w']
+
+        # Space (in px) per word boundary
+        if len(fwords) in [0, 1]:
+            spwd = 0
+            bonus_sp_px = 0
+        else:
+            spwd = px_all_spaces // line_info['total_spaces']
+            bonus_sp_px = px_all_spaces % line_info['total_spaces']
+
+        # De-facto width legality check (cannot be overridden):
+        if px_all_spaces < 0 or spwd < line_info['space_w']:
+            # Not enough room to write this text on this line; or the
+            # calculated space per word is narrower than a typed space char
+            return FLine
+
+        # Handle legality check for height.
+        is_legal = True
+        if not override_legal_check:
+            is_legal = self._check_legal_cursor(
+                (0, line_info['line_word_h']), cursor=cursor)
+        if not is_legal:
+            return FLine
+
+        # Write the indent (i.e. just move the cursor to the right).
+        coord = getattr(self, cursor, self.text_cursor)
+        xy_delta = (0, 0)
+
+        fwords_left = len(fwords)
+        for fword in fwords:
+            # Write the word
+            self.text_draw.text(
+                coord, fword.txt, font=fword_info['font_dict'][fword],
+                fill=font_RGBA)
+
+            # We already calculated each word's width, height, so pull
+            # that, and update the cursor
+            new_xy_delta = fword_info['word_px_dict'][fword]
+            coord, xy_delta = update_coord(coord, xy_delta, new_xy_delta)
+
+            # Unless it's the last word (or no space should be written after
+            # this fword -- e.g., an indent), then write a space (i.e. move
+            # the cursor right the appropriate px).
+            if fwords_left > 1 and fword.xspace:
+                # Default space distance to justified text...
+                space = spwd
+                if bonus_sp_px > 0:
+                    # Spend each extra space px, one at a time.
+                    space += 1
+                    bonus_sp_px -= 1
+                # ... but reset to a single space character, if not justifying.
+                if not justify:
+                    space = fword_info['space_w']
+                coord, xy_delta = update_coord(coord, xy_delta, (space, 0))
+
+            fwords_left -= 1
+
+        self.next_line_cursor(cursor=cursor, commit=True)
+        return None
+
 
     def write_justified_line(
             self, text, cursor='text_cursor', font_RGBA=None,
@@ -627,10 +777,13 @@ class TextBox:
         to be passed as `text`. It will force any text to be justified,
         whether it was deduced as 'justifiable' or not. Use the
         `.write_line()` method, if you need guardrails for that purpose.
-        :param text: The text to be written (str only).
+        :param text: The text to be written, either a string, or a FLine
+        or PLine object. (If a user is calling this method directly,
+        `text` is most likely be a string.)
         :param indent: An int specifying how many leading spaces (i.e.
         characters, not px) to write before the `text`.
         (Defaults to None)
+        :param formatting: Whether
         :return: Returns a list of the text that was NOT written (i.e.
         either an empty list, or a single-element list containing the
         original text -- to mirror the `.write_paragraph()` method).

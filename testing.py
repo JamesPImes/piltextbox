@@ -1,6 +1,8 @@
 
 
 import piltextbox
+from piltextbox.textbox.formatting import FWord, FLine, PLine, UnwrittenLines
+from piltextbox.textbox.formatting import format_parse, flat_parse, parse_into_line
 
 tb = piltextbox.TextBox((400,600))
 
@@ -55,11 +57,21 @@ tb.set_truetype_font(typeface=test_fonts['boldital'], formatting='boldital')
 # tb.render().show()
 
 
-long_txt = '''The Public Land <b>Survey System (PLSS) is <i>the surveying method developed and used </b>in the United States to plat, or</i> divide, real property for sale and settling. Also known as the Rectangular Survey System, it was created by the Land Ordinance of 1785 to survey land ceded to the United States by the Treaty of Paris in 1783, following the end of the American Revolution. Beginning with the Seven Ranges, in present-day Ohio, the PLSS has been used as the primary survey method in the United States. Following the passage of the Northwest Ordinance, in 1787, the Surveyor General of the Northwest Territory platted lands in the Northwest Territory. The Surveyor General was later merged with the General Land Office, which later became a part of the U.S. Bureau of Land Management (BLM). Today, the BLM controls the survey, sale, and settling of the new lands. '''
-txt = tb._wrap_text_formatted(long_txt, 5, 10)
+long_txt = '''The Public Land <b>Survey System (PLSS) is <i>the surveying method developed and used </b>in the United States to plat, or</i> divide, real property for sale and settling. Also known as the Rectangular Survey System, it was created by the Land Ordinance of 1785 to survey land ceded to the United States by the Treaty of Paris in 1783, following the end of the American Revolution. Beginning with the Seven Ranges, in present-day Ohio, the PLSS has been used as the primary survey method in the United States. Following the passage of the Northwest Ordinance, in 1787, the Surveyor General of the Northwest Territory platted lands in the Northwest Territory. The Surveyor General was later merged with the General Land Office, which later became a part of the U.S. Bureau of Land Management (BLM). Today, the BLM controls the survey, sale, and settling of the new lands.'''
 
-for dct in txt:
-    l = []
-    for fw in dct['fwords']:
-        l.append(fw.txt)
-    print(' '.join(l))
+# testing = tb._wrap_text_TESTING(long_txt, 5, 10)
+# print(str(type(testing)) + '_' + str(testing.formatting))
+#
+# testing.print()
+#
+# testing = tb._wrap_text_TESTING(long_txt, 5, 10, formatting=True)
+# print(str(type(testing)) + '_' + str(testing.formatting))
+#
+# testing.print()
+
+#uw = tb.write_paragraph(long_txt, justify=True, formatting=True)
+ln = parse_into_line('The Public Land <b>Survey System (PLSS) is <i>the surveying', formatting=True)
+
+tb._write_fline(ln, 'text_cursor', tb.font_RGBA, justify=True)
+
+tb.render().show()
