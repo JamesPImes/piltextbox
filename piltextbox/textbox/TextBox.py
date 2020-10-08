@@ -366,30 +366,30 @@ class TextBox:
         """Continue writing the unwritten lines returned by
         `.write_paragraph()`, now beginning at the specified cursor.
 
-        IMPORTANT: `continue_lines` must be a list. It should be exactly
-        as returned as unwritten by `.write_paragraph()`. If you do need
-        to modify something, each dict in the list should still contain
-        two keys:
-            'txt' -> The text to be written for that line.
-            'justifiable' -> Whether that line is justifiable.
-        (Modifying lines may cause them to break the boundaries of the
-        textbox.)
+        IMPORTANT: `continue_lines` must be an UnwrittenLines object.
 
-        NOTE: Text will not be re-wrapped. This assumes that the TextBox
-        being written in is configured identically to the one that
-        returned the unwritten lines.
+        NOTE: Text will not be re-wrapped. This method assumes that the
+        TextBox being written in is configured identically to the one
+        that returned the unwritten lines.
+
+        NOTE ALSO: The UnwrittenLines object gets modified in-situ --
+        line objects in the `.lines` attribute get popped with `.pop()`.
 
         All other applicable parameters have the same effect as in
         `.write_paragraph()`. (Parameters that affect indents and text
-        wrapping have no effect here.)
+        wrapping have no effect here; and formatting can not be
+        discarded.)
 
-        :param continue_lines: A list of lines to be written. (Each
-        element in the list must be a dict, as discussed above.)
-        :return: Returns a list of the lines that could NOT be written.
+        :param continue_lines: An UnwrittenLines object be written.
+        :return: Returns as follows:
+        -- All lines successfully written -> returns None
+        -- At least one line was not written -> returns the same
+        UnwrittenLines object, with its `.lines` attribute culled to
+        only the remaining lines.
         """
 
         unwrit_lines = self.write_paragraph(
-            continue_lines=continue_lines, cursor=cursor, font_RGBA=font_RGBA,
+            text=continue_lines, cursor=cursor, font_RGBA=font_RGBA,
             reserve_last_line=reserve_last_line,
             override_legal_check=override_legal_check, justify=justify)
         return unwrit_lines
@@ -408,20 +408,21 @@ class TextBox:
 
         :param text: Text to be written (a string), or an UnwrittenLines
         object.
-        :param cursor: Which cursor to begin writing at.
+        :param cursor: Which cursor to begin writing at. (Defaults to
+        'text_cursor')
         :param font_RGBA: A 4-tuple specifying the font color. (If not
         specified, will fall back on whatever is in this object's
         `.font_RGBA` attrib.)
         :param reserve_last_line: If reached, leave the last line in the
-        textbox empty (and return a list of any unwritten lines).
-        (Defaults to `False`)
+        textbox empty (and return an UnwrittenLines object containing
+        any lines that were not written). (Defaults to `False`)
         :param override_legal_check: Disregard whether the written text
         would go beyond the boundaries of this TextBox. (Defaults to
         `False`)
-        :param paragraph_indent: How many leading spaces (i.e.
-        characters, not px) before the first line. (If not specified,
-        defaults to `self.paragraph_indent`.)
-        :param new_line_indent: How many leading spaces (i.e.
+        :param paragraph_indent: An int for how many leading spaces
+        (i.e. characters, not px) before the first line. (If not
+        specified, defaults to `self.paragraph_indent`.)
+        :param new_line_indent: An int for how many leading spaces (i.e.
         characters, not px) before each subsequent line. (If not
         specified, defaults to `self.new_line_indent`.)
         :param justify: A bool, whether the written text should be
@@ -429,17 +430,18 @@ class TextBox:
         right edge of the textbox. If used, all lines in the paragraph
         will be justified, except the final line, and any line that ends
         with a linebreak or return character. (Defaults to `False`)
-        IMPORTANT: If `continue_lines` is specified, then `text` is
-        completely ignored. The lines will not be re-wrapped, and it is
-        assumed that this TextBox object is identical in configuration
-        to the TextBox object that returned the lines as unwritten.
+        IMPORTANT: If an UnwrittenLines object is passed as `text`, the
+        lines will not be re-wrapped, and it is assumed that this
+        TextBox object is identical in configuration to the TextBox
+        object that returned the lines as unwritten.
         :param formatting: A bool, whether to parse format codes (e.g.,
         '<b>' or '</b>' in the input text.
         :param discard_formatting: A bool, whether to discard all
         formatting and only write plain text. (Will have no effect
         unless parameter `formatting=` is True. Will ALSO have no effect
         if the text has already been word-wrapped.)
-        :return: Returns a list of the lines that could NOT be written.
+        :return: Returns an UnwrittenLines object containing the lines
+        that could NOT be written.
         """
 
         # If any of these parameters were not spec'd, pull from attribs
@@ -545,10 +547,11 @@ class TextBox:
         :return: Returns as follows:
         -- Line successfully written -> returns None
         -- Line unsuccessfully written, and param `formatting` was False
-            -> returns a PLine object, being the unwritten line.
+            -> returns a PLine object, being the unwritten line, stored
+            as a PLine object.
         -- Line unsuccessfully written, and param `formatting` was True
-            -> returns a FLine object, being the unwritten line, with
-                encoded formatting.
+            -> returns a FLine object, being the unwritten line, stored
+                as a FLine object (with encoded formatting).
         NOTE: Parameter `formatting` is ignored if a PLine or FLine obj
         was passed originally, and if it was not written, the original
         PLine or FLine will be returned (i.e. it will not convert a
@@ -900,15 +903,47 @@ class TextBox:
         self.next_line_cursor(cursor=cursor, commit=True)
         return []
 
-    def write_formatted_words(
+    def write(
             self, text, cursor='text_cursor', font_RGBA=None,
-            reserve_last_line=False, override_legal_check=False,
-            paragraph_indent=None, new_line_indent=None) -> list:
+            reserve_last_line=False, formatting=False,
+            discard_formatting=False, paragraph_indent=None,
+            new_line_indent=None):
         """
         Write the text word-by-word, for as many words as can fit. Can
-        not use this for justified text.
+        NOT use this method for justified text (for that, use
+        `.write_line()` or `.write_paragraph()` methods).
+
         NOTE: Will break to new lines as necessary, but will NOT update
-        the cursor to a new line after writing.
+        the cursor to a new line after writing. To do that, call
+        `.next_line_cursor()` afterwards. If it runs out of space, then
+        the unwritten words will be returned as a list of FWord objects.
+
+        :param text: A string of text to write, or a list of FWord
+        objects (such as what gets returned by this method if not all
+        could fit in the TextBox).
+        :param cursor: Which cursor to begin writing at. (Defaults to
+        'text_cursor')
+        :param font_RGBA: A 4-tuple specifying the font color. (If not
+        specified, will fall back on whatever is in this object's
+        `.font_RGBA` attrib.)
+        :param reserve_last_line: If reached, leave the last line in the
+        textbox empty (and return a list of any unwritten FWord
+        objects). (Defaults to `False`)
+        :param paragraph_indent: An int for how many leading spaces
+        (i.e. characters, not px) before the first line. (If not
+        specified, defaults to `self.paragraph_indent`.)
+        :param new_line_indent: An int for how many leading spaces (i.e.
+        characters, not px) before each subsequent line. (If not
+        specified, defaults to `self.new_line_indent`.)
+        :param formatting: A bool, whether to parse format codes (e.g.,
+        '<b>' or '</b>' in the input text.
+        :param discard_formatting: A bool, whether to discard all
+        formatting and only write plain text. (Will have no effect
+        unless parameter `formatting=` is True. Will ALSO have no effect
+        unless `text` is passed as a string.)
+        :return: Returns a list of FWord objects, i.e. the words that
+        could NOT be written. (Which can be passed as `text` in another
+        call of `.write()` on another TextBox object.)
         """
 
         if paragraph_indent is None:
@@ -917,34 +952,47 @@ class TextBox:
         if new_line_indent is None:
             new_line_indent = self.new_line_indent
 
-        fwords = format_parse(text)
-
         def insert_new_indent(fwords_list, indent_chars):
             if indent_chars in [None, 0]:
                 return
-            ind_txt = FWord(
-                ' ' * paragraph_indent, bold=False, ital=False, xspace=False)
-            fwords_list.insert(0, ind_txt)
+            ind_fw = FWord(
+                ' ' * indent_chars, bold=False, ital=False, xspace=False)
+            fwords_list.insert(0, ind_fw)
             return
 
+        next_indent = paragraph_indent
+        if isinstance(text, str):
+            fwords = all_parse(text, formatting, discard_formatting)
+        elif isinstance(text, list):
+            fwords = text
+            next_indent = new_line_indent
+        else:
+            raise TypeError(
+                '`text` must be passed as a string, or as a list of FWord '
+                'objects')
+
         if reserve_last_line and self.on_last_line(cursor=cursor):
-            return [text]
+            return fwords
 
         if font_RGBA is None:
             font_RGBA = self.font_RGBA
 
         coord = getattr(self, cursor, 'text_cursor')
 
-        # Insert the initial indent (if any) at the start of the list.
-        insert_new_indent(fwords, paragraph_indent)
+        if self.at_new_line(cursor=cursor):
+            # Insert the initial indent (if any) at the start of the list.
+            insert_new_indent(fwords, next_indent)
 
+        next_indent = new_line_indent
+
+        last_inserted_indent = False
         consecutive_unsuccessful = 0
         while len(fwords) > 0:
             fword = fwords.pop(0)
             styling = f"{'bold' * fword.bold}{'ital' * fword.ital}"
             if styling == '':
                 styling = 'main'
-            font = self.formatted_fonts[styling]
+            font = self.formatted_fonts.get(styling, self.font)
 
             legal = self._check_legal_textwrite(fword.txt, font, cursor)
             if legal:
@@ -954,19 +1002,29 @@ class TextBox:
                     xy_delta, cursor=cursor, add_space=fword.xspace,
                     space_font=font)
                 consecutive_unsuccessful = 0
+                last_inserted_indent = False
             else:
                 coord = self.next_line_cursor(cursor=cursor)
                 fwords.insert(0, fword)
-                insert_new_indent(fwords, new_line_indent)
                 consecutive_unsuccessful += 1
 
-            if consecutive_unsuccessful > 1:
+            if consecutive_unsuccessful > 1 \
+                    or (reserve_last_line and self.on_last_line(cursor=cursor)):
                 # If we've gone two consecutive passes without a legal
-                # writing, just return the remaining list of FWord objs.
+                # writing; or if we're on the last line and want to reserve it
+                # we return the remaining list of FWord objs.
+                if last_inserted_indent:
+                    # If we've most recently added an indent, get rid of it.
+                    fwords.pop(0)
                 return fwords
 
-            if reserve_last_line and self.on_last_line(cursor=cursor):
-                return fwords
+            if self.at_new_line(cursor=cursor) and not last_inserted_indent:
+                insert_new_indent(fwords, next_indent)
+                last_inserted_indent = True
+
+        # Unnecessary to state, but to be clear: If we successfully write every
+        # word in the text, we return None.
+        return None
 
     @staticmethod
     def simplify_unwritten_lines(unwritten_lines) -> list:

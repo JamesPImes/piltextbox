@@ -4,7 +4,7 @@ import piltextbox
 from piltextbox.textbox.formatting import FWord, FLine, PLine, UnwrittenLines
 from piltextbox.textbox.formatting import format_parse, flat_parse, parse_into_line
 
-tb = piltextbox.TextBox((400,600))
+tb = piltextbox.TextBox((400,600), paragraph_indent=4, new_line_indent=12)
 
 # These are not included in the `piltextbox` github repo, but can be acquired at
 # <https://github.com/liberationfonts/liberation-fonts/releases/tag/2.1.1>
@@ -85,7 +85,25 @@ txt = 'The Public Land <b>Survey System (PLSS) is <i>the surveying'
 # uw = tb.write_line(txt, formatting=False, justify=True)
 # uw = tb.write_paragraph(long_txt, formatting=True, justify=False)
 # uw = tb.write_paragraph(long_txt, formatting=False, justify=False)
-uw = tb.write_paragraph(long_txt, formatting=True, justify=True)
-uw = tb.write_paragraph(long_txt, formatting=False, justify=True)
+# uw = tb.write_paragraph(long_txt, formatting=True, justify=True)
+# uw = tb.write_paragraph(long_txt, formatting=False, justify=True)
 
-tb.render().show()
+uw = tb.write(long_txt, formatting=False, paragraph_indent=4, new_line_indent=10)
+tb.next_line_cursor()
+uw = tb.write(long_txt, formatting=False, paragraph_indent=4, new_line_indent=10)
+tb.next_line_cursor()
+uw = tb.write(long_txt, formatting=True)
+print(uw)
+for fw in uw:
+    print(fw.txt)
+
+tb2 = piltextbox.TextBox((400,600), paragraph_indent=4, new_line_indent=12)
+tb2.set_truetype_font(typeface=test_fonts['default'])
+tb2.set_truetype_font(typeface=test_fonts['bold'], formatting='bold')
+tb2.set_truetype_font(typeface=test_fonts['ital'], formatting='ital')
+tb2.set_truetype_font(typeface=test_fonts['boldital'], formatting='boldital')
+
+uw = tb2.write(uw)
+
+
+tb2.render().show()
