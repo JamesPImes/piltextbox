@@ -210,7 +210,7 @@ class TextBox:
         return x == 0
 
     def set_truetype_font(
-            self, size=None, typeface=None, RGBA=None, formatting='main'):
+            self, size=None, typeface=None, RGBA=None, style='main'):
         """
         Modify the size, typeface, and/or RGBA of the font. (Any
         unspecified parameters will leave the current attributes alone.)
@@ -224,9 +224,8 @@ class TextBox:
         However, if a truetype font was previously provided, then it
         need not be provided again.
         :param RGBA: A 4-tuple of the color for the font.
-        :param formatting: Specify what format this typeface is for
-        (must be 'main', 'bold', 'ital', or 'boldital'). Defaults to
-        'main'.
+        :param style: Specify what style this typeface is for (must be
+        'main', 'bold', 'ital', or 'boldital'). Defaults to 'main'.
         NOTE: Setting 'main' will ALSO set `self.font`, which is used
         for any non-formatted writing.
         :return: None
@@ -271,13 +270,13 @@ class TextBox:
             size = self.font_size
 
         fs = ('main', 'bold', 'ital', 'boldital')
-        if formatting not in fs:
+        if style not in fs:
             raise ValueError(
                 "`formatting` must be 'main', 'bold', 'ital', or 'boldital'")
 
-        self.formatted_fonts[formatting] = ImageFont.truetype(typeface, size)
+        self.formatted_fonts[style] = ImageFont.truetype(typeface, size)
 
-        if formatting == 'main':
+        if style == 'main':
             self.font = ImageFont.truetype(typeface, size)
 
             # We only want to change the respective typeface attribute AFTER
@@ -875,10 +874,10 @@ class TextBox:
         consecutive_unsuccessful = 0
         while len(fwords) > 0:
             fword = fwords.pop(0)
-            styling = f"{'bold' * fword.bold}{'ital' * fword.ital}"
-            if styling == '':
-                styling = 'main'
-            font = self.formatted_fonts.get(styling, self.font)
+            style = f"{'bold' * fword.bold}{'ital' * fword.ital}"
+            if style == '':
+                style = 'main'
+            font = self.formatted_fonts.get(style, self.font)
 
             legal = self._check_legal_textwrite(fword.txt, font, cursor)
             if legal:

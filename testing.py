@@ -14,10 +14,11 @@ test_fonts = {
     'ital': r'testing_fonts\LiberationSans-Italic.ttf',
     'boldital': r'testing_fonts\LiberationSans-BoldItalic.ttf'
 }
+
 tb.set_truetype_font(typeface=test_fonts['default'])
-tb.set_truetype_font(typeface=test_fonts['bold'], formatting='bold')
-tb.set_truetype_font(typeface=test_fonts['ital'], formatting='ital')
-tb.set_truetype_font(typeface=test_fonts['boldital'], formatting='boldital')
+tb.set_truetype_font(typeface=test_fonts['bold'], style='bold')
+tb.set_truetype_font(typeface=test_fonts['ital'], style='ital')
+tb.set_truetype_font(typeface=test_fonts['boldital'], style='boldital')
 #tb.set_truetype_font(typeface=test_fonts['default'], formatting='intentional_error')
 
 
@@ -62,9 +63,9 @@ tb.render().show()
 tb2 = piltextbox.TextBox((400,1600), paragraph_indent=4, new_line_indent=12)
 
 tb2.set_truetype_font(typeface=test_fonts['default'])
-tb2.set_truetype_font(typeface=test_fonts['bold'], formatting='bold')
-tb2.set_truetype_font(typeface=test_fonts['ital'], formatting='ital')
-tb2.set_truetype_font(typeface=test_fonts['boldital'], formatting='boldital')
+tb2.set_truetype_font(typeface=test_fonts['bold'], style='bold')
+tb2.set_truetype_font(typeface=test_fonts['ital'], style='ital')
+tb2.set_truetype_font(typeface=test_fonts['boldital'], style='boldital')
 
 
 tb2.continue_paragraph(unwrit, justify=True)
