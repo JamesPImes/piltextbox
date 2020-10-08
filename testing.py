@@ -79,9 +79,13 @@ long_txt = '''The Public Land <b>Survey System (PLSS) is <i>the surveying method
 
 txt = 'The Public Land <b>Survey System (PLSS) is <i>the surveying'
 
-uw = tb.write_line(txt, formatting=True, justify=False)
-uw = tb.write_line(txt, formatting=False, justify=False)
-uw = tb.write_line(txt, formatting=True, justify=True)
-uw = tb.write_line(txt, formatting=False, justify=True)
+# uw = tb.write_line(txt, formatting=True, justify=False)
+# uw = tb.write_line(txt, formatting=False, justify=False)
+# uw = tb.write_line(txt, formatting=True, justify=True)
+# uw = tb.write_line(txt, formatting=False, justify=True)
+# uw = tb.write_paragraph(long_txt, formatting=True, justify=False)
+# uw = tb.write_paragraph(long_txt, formatting=False, justify=False)
+uw = tb.write_paragraph(long_txt, formatting=True, justify=True)
+uw = tb.write_paragraph(long_txt, formatting=False, justify=True)
 
 tb.render().show()

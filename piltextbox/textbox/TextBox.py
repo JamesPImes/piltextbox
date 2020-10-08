@@ -442,8 +442,6 @@ class TextBox:
         :return: Returns a list of the lines that could NOT be written.
         """
 
-        font = self.font
-
         # If any of these parameters were not spec'd, pull from attribs
         if font_RGBA is None:
             font_RGBA = self.font_RGBA
@@ -465,35 +463,33 @@ class TextBox:
 
         attempt = 1
 
+        # Renaming this variable for clearer purpose from this point on.
+        unwritten = text
+
         # Write each line (until we can't anymore)
-        while text.remaining > 0:
+        while unwritten.remaining > 0:
             if reserve_last_line and self.on_last_line(cursor=cursor):
-                return text
+                return unwritten
             attempt += 1
-            line = text._stage_next_line()
+            line = unwritten._stage_next_line()
 
-            # Write the line. Store the resulting list, to see if everything
+            # Write the line. Store the returned value, to see if everything
             # got written.
-            if justify:
-                unwrit_line = self.write_justified_line(
-                    text=line, cursor=cursor, font_RGBA=font_RGBA,
-                    reserve_last_line=reserve_last_line,
-                    override_legal_check=override_legal_check, indent=0,
-                    formatting=formatting)
-            else:
-                unwrit_line = self.write_line(
-                    line, cursor=cursor, font_RGBA=font_RGBA, indent=None,
-                    reserve_last_line=reserve_last_line,
-                    override_legal_check=override_legal_check, justify=justify)
+            unwrit_line = self.write_line(
+                line, cursor=cursor, font_RGBA=font_RGBA, indent=None,
+                reserve_last_line=reserve_last_line,
+                override_legal_check=override_legal_check, justify=justify)
 
-            if unwrit_line != []:
+            if unwrit_line is not None:
                 # Something couldn't be written. Put the last line back
-                # in and return.
-                text._unstage()
-                return text
-            text._successful_write()
+                # in and return what's left.
+                unwritten._unstage()
+                return unwritten
 
-        return text
+            # Successfully wrote that line, so remove it from unwritten.
+            unwritten._successful_write()
+
+        return unwritten
 
     def write_line(
             self, text, cursor='text_cursor', font_RGBA=None,
