@@ -12,26 +12,62 @@ from .formatting import format_parse_deep, all_parse, parse_into_line
 
 class TextBox:
     """
-    An object containing a PIL.Image object with added functionality for
+    A container for a PIL.Image.Image object with functionality for
     streamlined text writing. (Currently in 'RGBA' mode only.)
 
-    Access the PIL.Image object of the writable area in `.im` attribute
+    Access the Image object of the writable area in `.im` attribute
     (excludes margins, if any).
-    Access a PIL.ImageDraw object of the writable area in `.text_draw`
-    attribute.
-    IMPORTANT: To get a copy of the PIL.Image (that leaves the `.im`
+    Access a PIL.ImageDraw.ImageDraw object of the writable area in
+    `.text_draw` attribute.
+    IMPORTANT: To get a *copy* of the Image (that leaves the `.im`
     attribute separate and intact), use the `.render()` method, which
     will include the margins (if any).
 
     Use `.write_paragraph()` to write paragraphs (or paragraph-like
-    text) with automatic linebreaks and indents.
+    text) with automatic linebreaks and indents, with optional block-
+    justified.
 
-    Use `.write_line()` to write individual lines, with optional indent.
+    Use `.write_line()` to write individual lines, with optional indent,
+    and optionally block-justified.
+
+    Use `.write()` to write word-by-word, but with block-justification
+    not allowed.
 
     IMPORTANT: If changing the font size or font typeface, use the
-    `.set_truetype_font()` method. Alternatively, any PIL.ImageFont can
-    be set to the `self.font` attribute; but then be sure to call
-    `.deduce_chars_per_line()`.
+    `.set_truetype_font()` method. (Changing a font AFTER any particular
+    text has been word-wrapped and/or formatted will NOT have an effect
+    on that text. There is no 'undo', so any text that is written stays
+    written. Moreover, any words or lines returned as unwritten (e.g.,
+    if there was not enough space in the textbox to write it all) will
+    NOT capture subsequent changes to fonts; and in fact doing so will
+    probably have unintended consequences. Best practice is to first set
+    all fonts, then write all text that use those fonts, and repeat as
+    necessary.
+
+    FOR FORMATTED TEXT (bold / ital):
+    User MUST explicitly set 'bold', 'ital', and 'boldital' fonts with
+    `.set_truetype_font()` method BEFORE attempting to write any
+    formatted text. Otherwise, all formatted text will simply use the
+    main font that was set at the time.
+
+    Include these format codes within the string passed to the writing
+    method (AND specify `formatting=True` in the method) in order to
+    toggle formatted text:
+    -- Turn bold on and off with codes '<b>' and '</b>'.
+    -- Turn italics on and off with codes '<i>' and '</i>'.
+
+    Turning bold/ital on when writing one string (with any writing
+    function) will NOT keep for the next written string.
+        ex1: '<b>The quick brown fox'  ->  written in bold
+        ex2: 'jumped over'  ->  not written in bold (or ital)
+        ex3: '<b><i>the lazy</b> dog</i>'
+            -> `the lazy` is bold+ital; `dog` is ital only.
+
+    Format codes can ONLY be captured at the outside of words, and
+    OUTSIDE all punctuation.
+        ex4: '<b>The quick</b> brown fox'  ->  Both codes are OK.
+        ex5: '<b><i>jumped ov</b>er the lazy fox</i>.'
+            -> Neither the '</b>' nor the '</i>' will be captured.
     """
 
     def __init__(
@@ -41,7 +77,8 @@ class TextBox:
             margins=None):
         """
         :param size: 2-tuple of (width, height).
-        :param typeface: The filepath to a truetype font (.ttf file)
+        :param typeface: The filepath to a truetype font (.ttf file) to
+        use for the primary font.
         :param font_size: The size of the font to create.
         :param bg_RGBA: 4-tuple of the background color. (Defaults to
         white, full opacity.)
@@ -89,9 +126,6 @@ class TextBox:
         if None not in [typeface, font_size]:
             self.set_truetype_font(font_size, typeface)
 
-        # How many characters we can safely fit per line, using our font
-        self.text_line_width = self.deduce_chars_per_line()
-
         # How many spaces (i.e. characters, not px) before the first
         # line of a new paragraph
         self.paragraph_indent = paragraph_indent
@@ -107,7 +141,8 @@ class TextBox:
 
     def _new_tb(self):
         """
-        INTERNAL:
+        INTERNAL USE:
+
         Create a new image for the text area. If margins were specified
         at init, adjust the size of the writable area appropriately.
         Store the Image and the ImageDraw objects to `.im` and
@@ -129,13 +164,13 @@ class TextBox:
 
     def render(self) -> Image:
         """
-        Get a unique PIL.Image object of the textbox. Margins will be
-        included if they were set at init. (Leaves `self.im` in place
+        Get a unique PIL.Image.Image object of the textbox. Margins will
+        be included if they were set at init. (Leaves `self.im` in place
         by creating a copy, so the returned Image object can be
         manipulated without modifying the original.)
 
-        :return: A copy of the PIL.Image object containing the written
-        text, and containing the margins (if any).
+        :return: A copy of the PIL.Image.Image object containing the
+        written text, and containing the margins (if any).
         """
         if self._margins is None:
             return self.im.copy()
@@ -152,7 +187,7 @@ class TextBox:
     def text_line_height(self):
         """
         The height (in px) needed to write a line of text (not including
-        space between lines).
+        space between lines), using the currently set main font.
         """
         return self.text_draw.textsize('XT', font=self.font)[1]
 
@@ -160,7 +195,7 @@ class TextBox:
         """
         Calculate how many lines can still be written between the coord
         of the specified cursor and the bottom of the textbox, using the
-        currently set font and line spacing.
+        currently set main font and line spacing.
 
         :return: An integer of how many lines can still be written.
         """
@@ -226,28 +261,30 @@ class TextBox:
         :param style: Specify what style this typeface is for (must be
         'main', 'bold', 'ital', or 'boldital'). Defaults to 'main'.
         NOTE: Setting 'main' will ALSO set `self.font`, which is used
-        for any non-formatted writing.
+        for writing any non-formatted text.
         :return: None
         """
 
         # Check for errors in the specified `RGBA`, and then set it.
         if RGBA is not None:
             if not isinstance(RGBA, tuple):
-                raise TypeError('`RGBA` must be tuple containing 4 ints from '
-                                f'0 to 255. (Argument of type \'{type(RGBA)}\' '
-                                'was passed)')
+                raise TypeError(
+                    '`RGBA` must be tuple containing 4 ints from 0 to 255. '
+                    f"(Argument of type \'{type(RGBA)}\' was passed)")
             elif len(RGBA) != 4:
-                raise ValueError(f"`RGBA` must be tuple containing 4 ints from "
-                                 f"0 to 255. "
-                                 f"(Passed tuple contained {len(RGBA)} elements.")
+                raise ValueError(
+                    f"`RGBA` must be tuple containing 4 ints from 0 to 255. "
+                    f"(Passed tuple contained {len(RGBA)} elements.")
             for val in RGBA:
                 if not isinstance(val, int):
-                    raise TypeError('`RGBA` must be tuple containing 4 ints '
-                                    'from 0 to 255. (Passed tuple contained '
-                                    f'element of type \'{type(val)}\')')
+                    raise TypeError(
+                        '`RGBA` must be tuple containing 4 ints from 0 to 255. '
+                        f"(Passed tuple contained element of "
+                        f"type \'{type(val)}\'")
                 if val < 0 or val > 255:
-                    raise ValueError('`RGBA` must contain ints from 0 to 255. '
-                                     f'(Passed tuple contained int {val})')
+                    raise ValueError(
+                        '`RGBA` must contain ints from 0 to 255. '
+                        f"(The passed tuple contained int {val})")
             # If it passes the checks, set it.
             self.font_RGBA = RGBA
 
@@ -284,69 +321,6 @@ class TextBox:
             self.font_size = size
             self.typeface = typeface
 
-            # And recalculate how many characters we can fit in a line.
-            self.deduce_chars_per_line()
-
-    def deduce_chars_per_line(
-            self, commit=True, harder_limit=False, w_limit=None):
-        """
-        Deduce (roughly) how many characters we can allow to be written
-        in a single line, using the currently set `.font`.
-
-        :param commit: Save the deduced max line-length to
-        `self.text_line_width`
-        :type commit: bool
-        :param w_limit: Provide a custom width limit (in px) to check
-        against. If not specified, we will check against the width of
-        the textbox. (Will result in shorter lines.)
-        written, but less likely to encroach on margins.
-        :type w_limit: int
-        :param harder_limit: Will check how many of a 'wider' character
-        can fit in a single line. (False by default.)
-        :type harder_limit: bool
-        """
-
-        font = self.font
-
-        if w_limit is None:
-            w_limit = self.im.width
-        base = 'The Quick Brown Fox Jumps Over The Lazy Dog'
-        if harder_limit:
-            # If using `harder_limit`, will take the widest known
-            # character in the font and only check how many of those
-            # will fit in a line within our textbox.
-
-            test = Image.new('RGBA', (1, 1))
-            test_draw = ImageDraw.Draw(test, 'RGBA')
-
-            # Check every char to see if it's the widest currently known
-            consideration_set = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_='
-            widest = 0
-            biggest_char = None
-            for char in consideration_set:
-                w, h = test_draw.textsize(text=char, font=font)
-                if w > widest:
-                    widest = w
-                    biggest_char = char
-            base = biggest_char
-
-        test = base[0]
-        num_chars = 1
-        while True:
-            # Add the next char from base to test (and wrap around).
-            test = test + base[num_chars % len(base)]
-            w, h = self.text_draw.textsize(text=test, font=font)
-
-            # Check if we've gone past the width of our textbox
-            if w > w_limit:
-                break
-            else:
-                num_chars += 1
-
-        if commit:
-            self.text_line_width = num_chars
-        return num_chars
-
     ################################
     # Writing Text
     ################################
@@ -360,23 +334,29 @@ class TextBox:
         Write the text as though it is a paragraph, with linebreaks
         inserted where necessary. Any lines that could not be fit within
         this textbox will be returned as a list of lines. (Optionally
-        use the `.continue_writing()` method to write these lines into a
-        new TextBox object, configured with identical font and width.)
+        use the `.continue_paragraph()` method to write the returned
+        UnwrittenLines object (if any) into a new TextBox object,
+        configured with identical font(s) and width.)
 
         :param text: Text to be written (a string), or an UnwrittenLines
         object (i.e. the object type that gets returned from this method
         if one or more lines could not be written).
+        IMPORTANT: If an UnwrittenLines object is passed as `text`, the
+        lines will NOT be re-wrapped, and it is assumed that this
+        TextBox object is identical in configuration to the TextBox
+        object that returned the lines as unwritten.
         :param cursor: Which cursor to begin writing at. (Defaults to
         'text_cursor')
         :param font_RGBA: A 4-tuple specifying the font color. (If not
-        specified, will fall back on whatever is in this object's
+        specified, will fall back to whatever is in this object's
         `.font_RGBA` attrib.)
-        :param reserve_last_line: If reached, leave the last line in the
-        textbox empty (and return an UnwrittenLines object containing
-        any lines that were not written). (Defaults to `False`)
-        :param override_legal_check: Disregard whether the written text
-        would go beyond the boundaries of this TextBox. (Defaults to
+        :param reserve_last_line: If it is reached, leave the last line
+        in the textbox empty (and return an UnwrittenLines object
+        containing any lines that were not written). (Defaults to
         `False`)
+        :param override_legal_check: Disregard whether the written text
+        would go beyond the bottom boundaries of this TextBox. (Defaults
+        to `False`)
         :param paragraph_indent: An int for how many leading spaces
         (i.e. characters, not px) before the first line. (If not
         specified, defaults to `self.paragraph_indent`.)
@@ -384,20 +364,17 @@ class TextBox:
         characters, not px) before each subsequent line. (If not
         specified, defaults to `self.new_line_indent`.)
         :param justify: A bool, whether the written text should be
-        justified -- i.e. stretched between the left indent and the
-        right edge of the textbox. If used, all lines in the paragraph
-        will be justified, except the final line, and any line that ends
-        with a linebreak or return character. (Defaults to `False`)
-        IMPORTANT: If an UnwrittenLines object is passed as `text`, the
-        lines will not be re-wrapped, and it is assumed that this
-        TextBox object is identical in configuration to the TextBox
-        object that returned the lines as unwritten.
+        block-justified -- i.e. stretched between the left indent and
+        the right edge of the textbox. If used, all lines in the
+        paragraph will be justified, except the final line, and any line
+        that originally ended with a linebreak or return character.
+        (Defaults to `False`)
         :param formatting: A bool, whether to parse format codes (e.g.,
-        '<b>' or '</b>' in the input text.
+        '<b>' or '</b>' in the input text string.
         :param discard_formatting: A bool, whether to discard all
         formatting and only write plain text. (Will have no effect
-        unless parameter `formatting=` is True. Will ALSO have no effect
-        if the text has already been word-wrapped.)
+        unless parameter `formatting=` is True AND `text` was passed as
+        a string.)
         :return: Returns an UnwrittenLines object containing the lines
         that could NOT be written.
         """
@@ -464,17 +441,18 @@ class TextBox:
 
         All other applicable parameters have the same effect as in
         `.write_paragraph()`.
-        (NB: Parameters that affect indents and text wrapping have no
-        effect here; and formatting can not be discarded.)
-
         :param continue_lines: An UnwrittenLines object be written.
+        :param cursor: Same as in `.write_paragraph().
+        :param font_RGBA: Same as in `.write_paragraph().
+        :param reserve_last_line: Same as in `.write_paragraph().
+        :param override_legal_check: Same as in `.write_paragraph().
+        :param justify: Same as in `.write_paragraph().
         :return: Returns as follows:
         -- All lines successfully written -> returns None
         -- At least one line was not written -> returns the same
-        UnwrittenLines object, with its `.lines` attribute culled to
-        only the remaining lines.
+            UnwrittenLines object, with its `.lines` attribute culled to
+            only the remaining lines.
         """
-
         unwrit_lines = self.write_paragraph(
             text=continue_lines, cursor=cursor, font_RGBA=font_RGBA,
             reserve_last_line=reserve_last_line,
@@ -489,20 +467,21 @@ class TextBox:
         """
         Write a line of text at the specified cursor, after first
         confirming that the line can fit within the textbox. (May
-        optionally override the legality check.) Any line that could
-        not be fit within this textbox will be returned as a list of
-        containing that line (in the same format as it was passed in).
+        optionally partially override the legality check.) Any line that
+        could not be fit within this textbox will be returned as a list
+        of containing that line (in the same format as it was passed in).
 
-        IMPORTANT: `text` can be passed as a string, OR as a dict with
-        two keys as follows:
-            'txt' -> The text to write (a string);
-            'justifiable' -> A bool, whether the text is justifiable.
+        `text` can be passed as a string, as a PLine object (i.e. a line
+        of plain text, as generated by this module), or as a FLine
+        object (a line of formatted text, also generated by this
+        module).
 
-        If a string is passed as parameter `text`, then parameter
-        `justify=True` will justify the line. However, if a PLine or
-        FLine object is passed as `text` (as discussed below), then BOTH
-        `justify=` parameter must be True, AND that obj's `.justifiable`
-        attribute must be True -- or the line will NOT be justified.
+        BLOCK-JUSTIFICATION:
+        If a string is passed as `text`, then parameter `justify=True`
+        will justify the line. However, if a PLine or FLine object is
+        passed as `text`, then BOTH `justify=` parameter must be True,
+        AND that obj's `.justifiable` attribute must be True -- or the
+        line will NOT be justified.
             ex:
                 # Will justify the line (passed a str-type):
                 line_1 = 'Testing Ex 1'
@@ -512,48 +491,46 @@ class TextBox:
                 line_2 = 'Testing Ex 2'
                 tb_obj.write_line(line_2, justify=False)
 
-                # Will justify the line:
+                # Will justify the line (passed as a PLine object):
                 line_3 = PLine(txt='Testing Ex 3', justifiable=True)
                 tb_obj.write_line(line_3, justify=True)
 
-                # Will NOT justify the line:
+                # Will NOT justify the line (passed as a PLine object):
                 line_4 = PLine(txt='Testing Ex 4', justifiable=False)
                 tb_obj.write_line(line_4, justify=True)
 
-                # Will NOT justify the line:
+                # Will NOT justify the line (passed as a PLine object):
                 line_5 = PLine(txt='Testing Ex 5', justifiable=True)
                 tb_obj.write_line(line_5, justify=False)
 
-                # (FLine objects are equivalent to PLine objects in this
-                # regard.)
+                # (FLine objects have the same requirements for block-
+                # justification as PLine objects.)
 
         :param text: The text to write (a string), or a PLine or FLine
         object.
         :param cursor: Which cursor to begin writing at. (Defaults to
         'text_cursor')
         :param font_RGBA: A 4-tuple specifying the font color. (If not
-        specified, will fall back on whatever is in this object's
+        specified, will fall back to whatever is in this object's
         `.font_RGBA` attrib.)
-        :param reserve_last_line: If reached, leave the last line in the
-        textbox empty (and return a FLine or PLine object, representing
-        the unwritten line). (Defaults to `False`)
+        :param reserve_last_line: If it is reached, leave the last line
+        in the textbox empty (and return a FLine or PLine object,
+        representing the unwritten line). (Defaults to `False`)
         :param override_legal_check: Disregard whether the written text
         would go beyond the boundaries of this TextBox. (Defaults to
         `False`)
         NOTE: `override_legal_check=True` will still NOT allow justified
         text that is too wide for the line (unjustified text is OK).
         :param indent: An int specifying how many leading spaces (i.e.
-        characters, not px) to write before the `text`.
-        (Defaults to None)
+        characters, not px) to write before the `text`. (Defaults to
+        None)
         :param justify: A bool, whether the written text should be
-        justified -- i.e. stretched between the left indent and the
-        right edge of the textbox.
+        block-justified -- i.e. stretched between the left indent and
+        the right edge of the textbox.
         :param formatting: A bool, whether to parse format codes (e.g.,
         '<b>' or '</b>' in the input text.
-        NOTE: Parameter `formatting` is ignored if a PLine or FLine obj
-        was passed originally, and if it was not written, the original
-        PLine or FLine will be returned (i.e. it will not convert a
-        PLine to an FLine, or vice versa, regardless of `formatting=`).
+        NOTE: Parameter `formatting` only applies when `text` is passed
+        as a string (i.e. it is ignored for PLine or FLine object).
         :param discard_formatting: A bool, whether to discard all
         formatting and only write plain text. (Will have no effect
         unless parameter `formatting=` is True AND `text` was passed as
@@ -569,7 +546,8 @@ class TextBox:
                 as a FLine object (with encoded formatting).
         NOTE: If a line was not successfully written, and `text` was
         originally passed as a FLine or PLine object, then that original
-        object will be returned.
+        object will be returned -- i.e. it will not convert a FLine to
+        PLine or vice versa.
         """
 
         bad_text_error = TypeError('`text` must be type: str, FLine, or PLine')
@@ -632,6 +610,23 @@ class TextBox:
     def _write_pline(
             self, pline_obj: PLine, cursor, font, font_RGBA,
             override_legal_check=False, indent=None):
+        """
+        INTERNAL USE:
+        Write the contents of a PLine object (a line of plain text).
+        May not justify the text.
+
+        :param pline_obj: A PLine object for the text to be written.
+        :param cursor: The cursor at which to begin writing.
+        :param font: Which font to use.
+        :param font_RGBA: The 4-tuple color code for this text.
+        :param override_legal_check: Disregard whether the written text
+        would go beyond the boundaries of this TextBox. (Defaults to
+        `False`)
+        :param indent: An integer, being the number of space characters
+        to use for the indentation of this line.
+        :return: If the line was successfully written, returns None.
+        If the line was NOT written, returns the original PLine object.
+        """
 
         # Convert `integer` from number of spaces (int) into a string of spaces
         if indent is not None:
@@ -679,6 +674,8 @@ class TextBox:
         been wrapped, wherein this information has already been
         calculated -- e.g., when this method is called from
         `.write_paragraph()`.)
+        :return: If the line was successfully written, returns None.
+        If the line was NOT written, returns the original FLine object.
         """
 
         def update_coord(coord, xy_delta, new_xy_delta) -> tuple:
@@ -782,7 +779,7 @@ class TextBox:
             discard_formatting=False, paragraph_indent=None,
             new_line_indent=None):
         """
-        Write the text word-by-word, for as many words as can fit. Can
+        Write the `text` word-by-word, for as many words as can fit. Can
         NOT use this method for justified text (for that, use
         `.write_line()` or `.write_paragraph()` methods).
 
@@ -799,8 +796,8 @@ class TextBox:
         :param font_RGBA: A 4-tuple specifying the font color. (If not
         specified, will fall back on whatever is in this object's
         `.font_RGBA` attrib.)
-        :param reserve_last_line: If reached, leave the last line in the
-        textbox empty (and return a list of any unwritten FWord
+        :param reserve_last_line: If it is reached, leave the last line
+        in the textbox empty (and return a list of any unwritten FWord
         objects). (Defaults to `False`)
         :param paragraph_indent: An int for how many leading spaces
         (i.e. characters, not px) before the first line. (If not
@@ -808,6 +805,10 @@ class TextBox:
         :param new_line_indent: An int for how many leading spaces (i.e.
         characters, not px) before each subsequent line. (If not
         specified, defaults to `self.new_line_indent`.)
+        NOTE: If the cursor is not currently at the start of a new line
+        OR if `text` is passed as a list of FWord objects, then this
+        method will assume that all resulting lines should be indented
+        pursuant to `new_line_indent`, and not `paragraph_indent`.
         :param formatting: A bool, whether to parse format codes (e.g.,
         '<b>' or '</b>' in the input text.
         :param discard_formatting: A bool, whether to discard all
@@ -815,10 +816,10 @@ class TextBox:
         unless parameter `formatting=` is True AND `text` was passed as
         a string.)
         :return: Returns a list of FWord objects, i.e. the words that
-        could NOT be written. (Which can be passed as `text` in another
-        call of `.write()` on another TextBox object, or recompiled into
-        a plain string with the `FWord.recompile_fwords()` static
-        method.)
+        could NOT be written. (Such a list can then be passed as `text`
+        in another call of `.write()` on another TextBox object, or
+        recompiled into a plain string with the static method
+        `TextBox.simplify_unwritten()`.)
         """
 
         if paragraph_indent is None:
@@ -903,31 +904,38 @@ class TextBox:
         return None
 
     @staticmethod
-    def simplify_unwritten_lines(unwritten_lines) -> list:
+    def simplify_unwritten(unwritten, exclude_indent=False):
         """
-        For lines that were returned unwritten by any of the TextBox
-        writing methods, this will 'unpack' the list into a single-level
-        list of lines of text (i.e. a list of simple strings). However,
-        it will destroy any data regarding whether those lines are
-        'justifiable', or if they originally ended in a linebreak or
-        return character.
+        For any text that was returned unwritten by any of the TextBox
+        writing methods, this will 'unpack' it into a block of plain
+        text. (It will destroy any data regarding formatting, block-
+        justification, or if they originally ended in a linebreak or
+        return character.)
 
-        :param unwritten_lines: Any list returned by any of the TextBox
-        writing methods.
-        :return: A list of lines of text (i.e. simple strings).
+        :param unwritten: Any object returned by any of the TextBox
+        writing methods -- i.e. FLine, PLine, UnwrittenLines objects, or
+        a list of FWord objects.
+        :param exclude_indent: Whether to discard indents, if any.
+        Defaults to `False`.
+        :return: A single string.
         """
-        final_lines = []
-        for line in unwritten_lines:
-            if isinstance(line, str):
-                final_lines.append(line)
-            else:
-                final_lines.append(line['txt'])
-        return final_lines
+        if isinstance(unwritten, UnwrittenLines):
+            lst = unwritten.simplify(exclude_indent=exclude_indent)
+            return '\n'.join(lst)
+        elif isinstance(unwritten, (PLine, FLine)):
+            return unwritten.simplify(exclude_indent=exclude_indent)
+        elif not isinstance(unwritten, list):
+            raise TypeError(
+                "`unwritten` must be of type FLine, PLine, UnwrittenLines; or "
+                " a list of FWord objects"
+            )
+
+        return FWord.recompile_fwords(unwritten, exclude_indent=exclude_indent)
 
     def _write_text(self, coord: tuple, text: str, font, font_RGBA) -> tuple:
         """
         INTERNAL USE:
-        Write `text` at the specified `coord`. Returns a tuple of the
+        Write `text` at the specified `coord`. Returns a 2-tuple of the
         width and height of the written text. Does NOT update a cursor.
         NOTE: This method does not care whether it goes outside the
             textbox, so be sure to handle `._check_legal_textwrite()`
@@ -984,11 +992,11 @@ class TextBox:
         Break down the `text` into a list of lines that will fit within
         the width of the TextBox, using the current settings.
         Additionally, parse any format codes with parameter
-        `formatting=True` (defaults to False) and discard those format
-        codes with parameter `discard_formatting=True` (also defaults to
-        False).
+        `formatting=True` (defaults to False) and optionally discard
+        those format codes with parameter `discard_formatting=True`
+        (also defaults to False).
 
-        Additionally, encodes whether each line is 'justifiable',
+        This method also encodes whether each line is 'justifiable',
         meaning whether it can be stretched from the left indent to the
         right edge of the textbox. (All lines will be justifiable,
         except the final line in the text, and except lines that
@@ -1012,8 +1020,6 @@ class TextBox:
         # TODO: Handle extra-long words (i.e. a single word can't fit
         #   on a single line by itself -- just break the word at
         #   whatever char that is, onto the next line).
-
-        def_font = self.font
 
         final_lines = UnwrittenLines(lines=None, formatting=formatting)
         max_w = self.im.width
@@ -1130,7 +1136,8 @@ class TextBox:
                     # an extraneous space after indent (for example).
                     cur_w = cand_w + space_w * new_fword.xspace
 
-            if current_line_to_add == candidate_line_list or last_word_is_candidate:
+            if current_line_to_add == candidate_line_list \
+                    or last_word_is_candidate:
                 justifiable = False
 
                 # Create a new FLine.

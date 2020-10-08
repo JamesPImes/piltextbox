@@ -101,14 +101,14 @@ class FWord:
         return existing_dict
 
     @staticmethod
-    def recompile_fwords(fwords: list):
+    def recompile_fwords(fwords: list, exclude_indent=False):
         """
         Recompile a list of FWord objects (e.g., what gets returned from
         the `TextBox.write()` method) into a single string (plain text),
         discarding any formatting.
         """
         fl = FLine(fwords=fwords)
-        return fl.simplify()
+        return fl.simplify(exclude_indent=exclude_indent)
 
 
 class FLine:

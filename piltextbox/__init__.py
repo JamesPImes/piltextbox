@@ -3,8 +3,8 @@
 """
 piltextbox - An extension for the Pillow (PIL) library for streamlined
 writing of text in an image, with automatic textwrapping and
-indendation, optional text-block justification, and configurable font
-settings.
+indendation, optional text-block justification, configurable font
+settings, and basic bold/italic formatting.
 """
 
 import piltextbox._constants as _constants
