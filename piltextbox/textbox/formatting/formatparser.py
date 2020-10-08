@@ -33,7 +33,7 @@ class FWord:
         self.xspace = xspace
 
     @staticmethod
-    def _examine_fwords(fwords: list, fonts: dict):
+    def _examine_fwords(fwords: list, fonts: dict, existing_dict=None):
         """
         INTERNAL USE:
         Examine the list of FWord objects, using the provided `fonts`
@@ -56,6 +56,8 @@ class FWord:
         whose keys are 'main', 'bold', 'ital', and 'boldital'.
         (HINT: `TextBox.formatted_fonts` attribute is probably what you
         want to use for the `fonts` argument here.)
+        :param existing_dict: Optionally, resume writing to a dict that
+        was previously returned by this method.
         """
 
         from PIL import Image, ImageDraw
@@ -63,13 +65,16 @@ class FWord:
         # Dummy ImageDraw object for checking size.
         dr = ImageDraw.Draw(Image.new('RGBA', (1, 1)), 'RGBA')
 
-        # Get the width of a single space character in px
-        space_w, _ = dr.textsize(' ', font=fonts['main'])
-
-        word_px_dict = {}
-        total_word_w = 0
-        total_word_h = 0
-        font_dict = {}
+        if existing_dict is None:
+            # Get the width of a single space character in px
+            space_w, _ = dr.textsize(' ', font=fonts['main'])
+            existing_dict =  {
+                'word_px_dict': {},
+                'font_dict': {},
+                'total_word_w': 0,
+                'total_word_h': 0,
+                'space_w': space_w
+            }
 
         for fword in fwords:
             # Get the styling for this word (e.g., 'boldital'), which also
@@ -82,19 +87,13 @@ class FWord:
             font = fonts.get(styling, fonts['main'])
 
             word_w, word_h = dr.textsize(fword.txt, font=font)
-            word_px_dict[fword] = (word_w, word_h)
-            font_dict[fword] = font
-            total_word_w += word_w
-            if word_h > total_word_h:
+            existing_dict['word_px_dict'][fword] = (word_w, word_h)
+            existing_dict['font_dict'][fword] = font
+            existing_dict['total_word_w'] += word_w
+            if word_h > existing_dict['total_word_h']:
                 total_word_h = word_h
 
-        return {
-            'word_px_dict': word_px_dict,
-            'font_dict': font_dict,
-            'total_word_w': total_word_w,
-            'total_word_h': total_word_h,
-            'space_w': space_w
-        }
+        return existing_dict
 
 
 class FLine:
@@ -292,6 +291,11 @@ class UnwrittenLines:
             elif isinstance(lines[0], FLine):
                 formatting = True
         self.formatting = formatting
+
+        # A dict containing size, font, etc. of each FWord in the `lines`
+        # (gets calculated during text wrapping, and might as well store it
+        # to avoid calculating twice or more).
+        self.fword_info = {}
 
     def simplify(self):
         """

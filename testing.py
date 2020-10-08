@@ -70,8 +70,11 @@ long_txt = '''The Public Land <b>Survey System (PLSS) is <i>the surveying method
 # testing.print()
 
 #uw = tb.write_paragraph(long_txt, justify=True, formatting=True)
-ln = parse_into_line('The Public Land <b>Survey System (PLSS) is <i>the surveying', formatting=True)
+#ln = parse_into_line('The Public Land <b>Survey System (PLSS) is <i>the surveying', formatting=True)
 
-tb._write_fline(ln, 'text_cursor', tb.font_RGBA, justify=True)
+#tb._write_fline(ln, 'text_cursor', tb.font_RGBA, justify=True)
 
-tb.render().show()
+uw = tb._wrap_text_TESTING(long_txt, 0, 0, False, True)
+uw.print()
+
+#tb.render().show()
