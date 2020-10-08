@@ -78,11 +78,10 @@ class TextBox:
 
         # IMPORTANT: Set font with `.set_truetype_font()` method.
         self.font = ImageFont.load_default()
+        # formatted fonts should have 'bold', 'ital', and 'boldital' if
+        # formatting is going to be parsed.
         self.formatted_fonts = {
-            'main': self.font,
-            'bold': None,
-            'ital': None,
-            'boldital': None
+            'main': self.font
         }
         self.typeface = typeface
         self.font_size = font_size
@@ -606,19 +605,11 @@ class TextBox:
             # so pull the plain text indent out, and convert to FLine.
 
             copy_pline = PLine(txt=text.txt, justifiable=text.justifiable)
-            find_indent = copy_pline.txt
 
             # Check how many leading spaces
-            deduced_indent = 0
-            i = 1
-            while True:
-                if find_indent.startswith(' ' * i):
-                    deduced_indent = i
-                else:
-                    break
-                i += 1
-
-            copy_pline.txt = copy_pline.txt[deduced_indent:]
+            orig_len = len(copy_pline.txt)
+            copy_pline.txt = copy_pline.txt.lstrip(' ')
+            deduced_indent = orig_len - len(copy_pline.txt)
             conv_line = copy_pline.to_fline()
 
             # Also add the `indent=` parameter, if any.

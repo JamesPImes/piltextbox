@@ -1,10 +1,12 @@
 
 
+# TODO: Clean up docstrings/comments in TextBox.py, then merge formatting branch into master.
+
 import piltextbox
 from piltextbox.textbox.formatting import FWord, FLine, PLine, UnwrittenLines
 from piltextbox.textbox.formatting import format_parse, flat_parse, parse_into_line
 
-tb = piltextbox.TextBox((400,1600), paragraph_indent=4, new_line_indent=12)
+tb = piltextbox.TextBox((400, 1600), paragraph_indent=4, new_line_indent=12)
 
 # These are not included in the `piltextbox` github repo, but can be acquired at
 # <https://github.com/liberationfonts/liberation-fonts/releases/tag/2.1.1>
