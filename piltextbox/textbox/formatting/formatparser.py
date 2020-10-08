@@ -91,9 +91,19 @@ class FWord:
             existing_dict['font_dict'][fword] = font
             existing_dict['total_word_w'] += word_w
             if word_h > existing_dict['total_word_h']:
-                total_word_h = word_h
+                existing_dict['total_word_h'] = word_h
 
         return existing_dict
+
+    @staticmethod
+    def recompile_fwords(fwords: list):
+        """
+        Recompile a list of FWord objects (e.g., what gets returned from
+        the `TextBox.write()` method) into a single string (plain text),
+        discarding any formatting.
+        """
+        fl = FLine(fwords=fwords)
+        return fl.simplify()
 
 
 class FLine:
@@ -171,6 +181,10 @@ class FLine:
         Return the text of this line in plain text (a string).
         """
         c_txt = ''
+        if self.fwords is None:
+            return None
+        if len(self.fwords) == 0:
+            return c_txt
         for i in range(len(self.fwords)):
             sp = ''
             if i != len(self.fwords) - 1:
@@ -410,6 +424,10 @@ def flat_parse(text) -> list:
     the returned list will have `False` for both its `.bold` and `.ital`
     attributes.
     """
+    text = text.strip('\r\n')
+    text = text.replace('\r', '\n')
+    text = text.replace('\n', ' ')
+
     raw_words = text.split(' ')
     fwords = []
     for word in raw_words:
@@ -428,6 +446,11 @@ def format_parse(text, discard_formatting=False) -> list:
 
     bold = False
     ital = False
+
+    text = text.strip('\r\n')
+    text = text.replace('\r', '\n')
+    text = text.replace('\n', ' ')
+
     raw_words = text.split(' ')
     fwords = []
     for word in raw_words:
