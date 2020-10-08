@@ -582,32 +582,28 @@ class TextBox:
         if reserve_last_line and self.on_last_line(cursor=cursor):
             return text
 
-        if justify and justifiable:
-            # If the line must be justified, pass everything on to the
-            # method that handles it (which returns the line in a list,
-            # if it couldn't be written -- same as this method).
-            unwrit_line = self.write_justified_line(
-                text=text, cursor=cursor, font_RGBA=font_RGBA,
-                reserve_last_line=reserve_last_line,
-                override_legal_check=override_legal_check, indent=indent)
-            # If sucessful (i.e. unwrit_line is an empty list), return
-            # that. Otherwise, return the orig_text inside a list.
-            if unwrit_line == []:
-                return unwrit_line
-            else:
-                return text
-
-        font = self.font
-
         if font_RGBA is None:
             font_RGBA = self.font_RGBA
 
         if formatting:
-            # TODO: def write_fline()...
-            pass
+            return self._write_fline(
+                text, cursor, font_RGBA, override_legal_check, indent,
+                justify=(justify and justifiable))
+        elif justify and justifiable and not formatting:
+            # We need to justify, but `text` is currently a PLine.
+            # (Block-justified text is accomplished by the FLine-writer)
+            conv_line = text.to_fline()
+            success_check = self._write_fline(
+                conv_line, cursor, font_RGBA, override_legal_check, indent,
+                justify=justify)
+            if success_check is not None:
+                # If it could not be written, we want to return the
+                # PLine (not the converted FLine)
+                return text
         else:
             return self._write_pline(
-                text, cursor, font, font_RGBA, override_legal_check, indent)
+                text, cursor, self.font, font_RGBA, override_legal_check,
+                indent)
 
     def _write_pline(
             self, pline_obj: PLine, cursor, font, font_RGBA,
@@ -669,9 +665,6 @@ class TextBox:
             xy_delta = (x_delta, y_delta)
 
             return coord, xy_delta
-
-        # TODO: Delete after testing:
-        font_RGBA = self.font_RGBA
 
         # Convert `integer` from number of spaces (int) into a string of spaces
         if indent is not None:
@@ -749,7 +742,6 @@ class TextBox:
 
         self.next_line_cursor(cursor=cursor, commit=True)
         return None
-
 
     def write_justified_line(
             self, text, cursor='text_cursor', font_RGBA=None,
