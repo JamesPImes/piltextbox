@@ -4,7 +4,7 @@ import piltextbox
 from piltextbox.textbox.formatting import FWord, FLine, PLine, UnwrittenLines
 from piltextbox.textbox.formatting import format_parse, flat_parse, parse_into_line
 
-tb = piltextbox.TextBox((400,600), paragraph_indent=4, new_line_indent=12)
+tb = piltextbox.TextBox((400,1600), paragraph_indent=4, new_line_indent=12)
 
 # These are not included in the `piltextbox` github repo, but can be acquired at
 # <https://github.com/liberationfonts/liberation-fonts/releases/tag/2.1.1>
@@ -20,90 +20,52 @@ tb.set_truetype_font(typeface=test_fonts['ital'], formatting='ital')
 tb.set_truetype_font(typeface=test_fonts['boldital'], formatting='boldital')
 #tb.set_truetype_font(typeface=test_fonts['default'], formatting='intentional_error')
 
-# # tb.write_paragraph('Hello, testing one two, three.\nAnd testing four, five.')
-#
-# import piltextbox.textbox.formatting.formatparser as parser
-# # f_text = "Testing <b>one,</b> <i>two,</i> <b><i>three,</b></i> four."
-# # fwords = parser.format_parse(f_text)
-# # for fw in fwords:
-# #     print(fw.txt)
-# #     print(fw.bold)
-# #     print(fw.ital)
-# #     print('\n\n')
-# # tb.write_formatted_words(f_text, paragraph_indent=8)
-#
-# long_txt = '''The Public Land Survey System (PLSS) is the surveying method developed and used in the United States to plat, or divide, real property for sale and settling. Also known as the Rectangular Survey System, it was created by the Land Ordinance of 1785 to survey land ceded to the United States by the Treaty of Paris in 1783, following the end of the American Revolution. Beginning with the Seven Ranges, in present-day Ohio, the PLSS has been used as the primary survey method in the United States. Following the passage of the Northwest Ordinance, in 1787, the Surveyor General of the Northwest Territory platted lands in the Northwest Territory. The Surveyor General was later merged with the General Land Office, which later became a part of the U.S. Bureau of Land Management (BLM). Today, the BLM controls the survey, sale, and settling of the new lands. '''
-# #long_txt = '''The Public Land <b>Survey System (PLSS) is <i>the surveying method developed and used </b>in the United States to plat, or</i> divide, real property for sale and settling. Also known as the Rectangular Survey System, it was created by the Land Ordinance of 1785 to survey land ceded to the United States by the Treaty of Paris in 1783, following the end of the American Revolution. Beginning with the Seven Ranges, in present-day Ohio, the PLSS has been used as the primary survey method in the United States. Following the passage of the Northwest Ordinance, in 1787, the Surveyor General of the Northwest Territory platted lands in the Northwest Territory. The Surveyor General was later merged with the General Land Office, which later became a part of the U.S. Bureau of Land Management (BLM). Today, the BLM controls the survey, sale, and settling of the new lands. '''
-# tb.next_line_cursor()
-# tb.write_justified_line(
-#     'Lorem <i>ipsum <b>dolor sit</b> amet, consectetur. Morbi mauris.</i>',
-#     indent=14, formatting=True)
-# # tb.write_justified_line(
-# #     'Lorem <i>ipsum <b>dolor sit</b> amet, consectetur. Morbi mauris.</i>',
-# #     indent=14, formatting=False)
-# #
-# # words = 'Lorem ipsum dolor <b>sit amet, consectetur<i> adipiscing elit.</b> Sed feugiat ante</i> in auctor auctor'.split(' ')
-# # for i in range(len(words)):
-# #     tb.write_justified_line(' '.join(words[:i]), formatting=True)
-#
-# #tb.write_formatted_words(long_txt, paragraph_indent=0, new_line_indent=0)
-# uw = tb.write_paragraph(long_txt)
-# uw = tb.write_paragraph(long_txt, justify=True)
-# uw = tb.write_paragraph(long_txt, justify=True)
-# uw = tb.write_paragraph(long_txt, justify=True)
-# uw = tb.write_paragraph(long_txt, justify=True)
-# print(uw)
-#
+
+txt = 'The <b>Public Land <i>Survey System (PLSS)</b> is</i> the'
+
+long_txt = '''The Public Land <b>Survey System (PLSS) is <i>the surveying method developed
+and used </b>in the United States to plat, or</i> divide, real property for sale and settling. Also known as the Rectangular Survey System, it was created by the Land Ordinance of 1785 to survey land ceded to the United States by the Treaty of Paris in 1783, following the end of the American Revolution. Beginning with the Seven Ranges, in present-day Ohio, the PLSS has been used as the primary survey method in the United States. Following the passage of the Northwest Ordinance, in 1787, the Surveyor General of the Northwest Territory platted lands in the Northwest Territory. The Surveyor General was later merged with the General Land Office, which later became a part of the U.S. Bureau of Land Management (BLM). Today, the BLM controls the survey, sale, and settling of the new lands.'''
+
+
+# # write word-by-word
+# tb.write(long_txt)
+# tb.write(long_txt, formatting=True)
+# tb.write(long_txt, formatting=True, discard_formatting=True)
 # tb.render().show()
 
 
-long_txt = '''The Public Land <b>Survey System (PLSS) is <i>the surveying method developed and used </b>in the United States to plat, or</i> divide, real property for sale and settling. Also known as the Rectangular Survey System, it was created by the Land Ordinance of 1785 to survey land ceded to the United States by the Treaty of Paris in 1783, following the end of the American Revolution. Beginning with the Seven Ranges, in present-day Ohio, the PLSS has been used as the primary survey method in the United States. Following the passage of the Northwest Ordinance, in 1787, the Surveyor General of the Northwest Territory platted lands in the Northwest Territory. The Surveyor General was later merged with the General Land Office, which later became a part of the U.S. Bureau of Land Management (BLM). Today, the BLM controls the survey, sale, and settling of the new lands.'''
+# # write individual lines
+# tb.write_line(txt)
+# tb.write_line(txt, formatting=True)
+# tb.write_line(txt, formatting=True, discard_formatting=True)
+# tb.write_line(txt, justify=True)
+# tb.write_line(txt, formatting=True, justify=True)
+# tb.render().show()
 
-# testing = tb._wrap_text_TESTING(long_txt, 5, 10)
-# print(str(type(testing)) + '_' + str(testing.formatting))
-#
-# testing.print()
-#
-# testing = tb._wrap_text_TESTING(long_txt, 5, 10, formatting=True)
-# print(str(type(testing)) + '_' + str(testing.formatting))
-#
-# testing.print()
+# write paragraphs
+unwrit = tb.write_paragraph(long_txt)
+unwrit = tb.write_paragraph(long_txt, formatting=True)
+unwrit = tb.write_paragraph(long_txt, formatting=True, discard_formatting=True)
+unwrit = tb.write_paragraph(long_txt, justify=True)
+unwrit = tb.write_paragraph(long_txt, formatting=True, justify=True)
+# testing over-writing
+unwrit = tb.write_paragraph(long_txt, formatting=True, justify=True)
+unwrit = tb.write_paragraph(
+    long_txt, formatting=True, justify=True, reserve_last_line=True)
+tb.write_line('Last line was reserved.')
 
-#uw = tb.write_paragraph(long_txt, justify=True, formatting=True)
-#ln = parse_into_line('The Public Land <b>Survey System (PLSS) is <i>the surveying', formatting=True)
+tb.render().show()
 
-#tb._write_fline(ln, 'text_cursor', tb.font_RGBA, justify=True)
 
-# uw = tb._wrap_text_TESTING(long_txt, 0, 0, False, True)
-# uw.print()
+# continue writing
 
-txt = 'The Public Land <b>Survey System (PLSS) is <i>the surveying'
+tb2 = piltextbox.TextBox((400,1600), paragraph_indent=4, new_line_indent=12)
 
-# uw = tb.write_line(txt, formatting=True, justify=False)
-# uw = tb.write_line(txt, formatting=False, justify=False)
-# uw = tb.write_line(txt, formatting=True, justify=True)
-# uw = tb.write_line(txt, formatting=False, justify=True)
-# uw = tb.write_paragraph(long_txt, formatting=True, justify=False)
-# uw = tb.write_paragraph(long_txt, formatting=False, justify=False)
-# uw = tb.write_paragraph(long_txt, formatting=True, justify=True)
-# uw = tb.write_paragraph(long_txt, formatting=False, justify=True)
-
-uw = tb.write(long_txt, formatting=False, paragraph_indent=4, new_line_indent=10)
-tb.next_line_cursor()
-uw = tb.write(long_txt, formatting=False, paragraph_indent=4, new_line_indent=10)
-tb.next_line_cursor()
-uw = tb.write(long_txt, formatting=True)
-print(uw)
-for fw in uw:
-    print(fw.txt)
-
-tb2 = piltextbox.TextBox((400,600), paragraph_indent=4, new_line_indent=12)
 tb2.set_truetype_font(typeface=test_fonts['default'])
 tb2.set_truetype_font(typeface=test_fonts['bold'], formatting='bold')
 tb2.set_truetype_font(typeface=test_fonts['ital'], formatting='ital')
 tb2.set_truetype_font(typeface=test_fonts['boldital'], formatting='boldital')
 
-uw = tb2.write(uw)
 
-
+tb2.continue_paragraph(unwrit, justify=True)
 tb2.render().show()

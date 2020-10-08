@@ -18,7 +18,8 @@ class FWord:
     The text of a word, whether or not it should be bolded and/or
     italicized, and whether it should be followed by a space.
     """
-    def __init__(self, txt, bold=False, ital=False, xspace=True):
+    def __init__(
+            self, txt, bold=False, ital=False, xspace=True, is_indent=False):
         """
         :param txt: A string, being the word itself.
         :param bold: A bool, whether to bold this word.
@@ -26,11 +27,13 @@ class FWord:
         :param xspace: A bool, whether a space may follow this word.
         Defaults to True; set to False for indents and perhaps
         punctuation.
+        :param indent: A bool, whether this FWord is an indent.
         """
         self.txt = txt
         self.bold = bold
         self.ital = ital
         self.xspace = xspace
+        self.is_indent = is_indent
 
     @staticmethod
     def _examine_fwords(fwords: list, fonts: dict, existing_dict=None):
@@ -176,7 +179,7 @@ class FLine:
             'total_spaces': total_spaces
         }
 
-    def simplify(self):
+    def simplify(self, exclude_indent=False):
         """
         Return the text of this line in plain text (a string).
         """
@@ -187,6 +190,8 @@ class FLine:
             return c_txt
         for i in range(len(self.fwords)):
             sp = ''
+            if exclude_indent and self.fwords[i].is_indent:
+                continue
             if i != len(self.fwords) - 1:
                 # Don't add a final space for the last fword in the list
                 sp = self.fwords[i].xspace * ' '
@@ -194,13 +199,14 @@ class FLine:
 
         return c_txt
 
-    def to_pline(self):
+    def to_pline(self, exclude_indent=False):
         """
         Convert this FLine object (formatted text) into a PLine object
         (plain text), discarding any encoded formatting, but retaining
         whether it is justifiable.
         """
-        return PLine(txt=self.simplify(), justifiable=self.justifiable)
+        txt = self.simplify(exclude_indent=exclude_indent)
+        return PLine(txt=txt, justifiable=self.justifiable)
 
     def _stage(self, indent=None):
         """

@@ -603,11 +603,33 @@ class TextBox:
                 justify=(justify and justifiable))
         elif justify and justifiable and not formatting:
             # We need to justify, but `text` is currently a PLine.
-            # (Block-justified text is accomplished by the FLine-writer)
-            conv_line = text.to_fline()
+            # Block-justified text is accomplished by the FLine-writer,
+            # so pull the plain text indent out, and convert to FLine.
+
+            copy_pline = PLine(txt=text.txt, justifiable=text.justifiable)
+            find_indent = copy_pline.txt
+
+            # Check how many leading spaces
+            deduced_indent = 0
+            i = 1
+            while True:
+                if find_indent.startswith(' ' * i):
+                    deduced_indent = i
+                else:
+                    break
+                i += 1
+
+            copy_pline.txt = copy_pline.txt[deduced_indent:]
+            conv_line = copy_pline.to_fline()
+
+            # Also add the `indent=` parameter, if any.
+            if indent is not None:
+                deduced_indent += indent
+
             success_check = self._write_fline(
-                conv_line, cursor, font_RGBA, override_legal_check, indent,
-                justify=justify)
+                conv_line, cursor, font_RGBA, override_legal_check,
+                indent=deduced_indent, justify=justify)
+
             if success_check is not None:
                 # If it could not be written, we want to return the
                 # PLine (not the converted FLine)
@@ -819,7 +841,8 @@ class TextBox:
             if indent_chars in [None, 0]:
                 return
             ind_fw = FWord(
-                ' ' * indent_chars, bold=False, ital=False, xspace=False)
+                ' ' * indent_chars, bold=False, ital=False, xspace=False,
+                is_indent=True)
             fwords_list.insert(0, ind_fw)
             return
 
@@ -1016,9 +1039,11 @@ class TextBox:
         rough_lines = text.split('\n')
 
         first_indent = FWord(
-            ' ' * paragraph_indent, bold=False, ital=False, xspace=False)
+            ' ' * paragraph_indent, bold=False, ital=False, xspace=False,
+            is_indent=True)
         later_indent = FWord(
-            ' ' * new_line_indent, bold=False, ital=False, xspace=False)
+            ' ' * new_line_indent, bold=False, ital=False, xspace=False,
+            is_indent=True)
 
         # Get an initial fword_info dict that we'll fill throughout (gets
         # filled with px-sizes of words, fonts, space width, etc.)
