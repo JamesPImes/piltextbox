@@ -436,16 +436,19 @@ def flat_parse(text) -> list:
     return fwords
 
 
-def format_parse(text, discard_formatting=False) -> list:
+def format_parse_deep(
+        text, discard_formatting=False, start_bold=False,
+        start_ital=False):
     """
     Split text into a list of FWord objects (i.e. the text of each word
-    with encoded formatting).
+    with encoded formatting); return a 3-tuple of the list of FWord
+    objects, the final bold (bool), and the final ital setting (bool).
     """
 
     format_codes = ('<b>', '</b>', '<i>', '</i>')
 
-    bold = False
-    ital = False
+    bold = start_bold
+    ital = start_ital
 
     text = text.strip('\r\n')
     text = text.replace('\r', '\n')
@@ -512,5 +515,16 @@ def format_parse(text, discard_formatting=False) -> list:
         # Set the first element in each list as the final value for bold/ital
         bold = all_bold[0]
         ital = all_ital[0]
+
+    return fwords, bold, ital
+
+
+def format_parse(
+        text, discard_formatting=False) -> list:
+    """
+    Split text into a list of FWord objects (i.e. the text of each word
+    with encoded formatting).
+    """
+    fwords, _, __ = format_parse_deep(text, discard_formatting)
 
     return fwords
