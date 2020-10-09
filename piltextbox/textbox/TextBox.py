@@ -1080,7 +1080,7 @@ class TextBox:
         space_w = fwi['space_w']
 
         # Construct lines word-by-word, until they are longer than can
-        # be printed within the width of the image. At that point,
+        # be written within the width of the image. At that point,
         # approve the last safe line, and start a new line with the word
         # that put it over the edge.
         # For each line, also encode whether it is 'justifiable', i.e.
@@ -1121,23 +1121,23 @@ class TextBox:
             # width in px of current line
             cur_w = 0
 
-            current_line_to_add = [indent, fwords.pop(0)]
-
-            for fword in current_line_to_add:
-                cur_w += fwi['word_px_dict'][fword][0]
-
-            candidate_line_list = current_line_to_add.copy()
+            current_line_to_add = []
+            candidate_line_list = []
             last_word_is_candidate = False
+            at_new_line = True
             while len(fwords) > 0:
                 # width in px of candidate line
                 cand_w = cur_w
 
-                new_fword = fwords.pop(0)
+                new_fword = indent
+                if not at_new_line:
+                    new_fword = fwords.pop(0)
+                at_new_line = False
                 candidate_line_list = current_line_to_add.copy()
                 candidate_line_list.append(new_fword)
 
                 w, h = fwi['word_px_dict'][new_fword]
-                cand_w += w + space_w
+                cand_w += w
                 if cand_w > max_w:
                     # Create a new FLine.
                     nl = FLine(
@@ -1150,7 +1150,10 @@ class TextBox:
                     # Append our new line, and start a new one
                     final_lines.lines.append(nl)
                     indent = later_indent
-                    current_line_to_add = [indent, new_fword]
+                    if not new_fword.is_indent:
+                        # Do not reinsert indents into fwords list
+                        fwords.insert(0, new_fword)
+                    current_line_to_add = []
                     last_word_is_candidate = True
 
                     # Reset cur_w to 0, plus width of indent and first word
@@ -1162,11 +1165,10 @@ class TextBox:
                     current_line_to_add = candidate_line_list
                     # We also add `space_w` (equivalent to an additional space
                     # char), but wait until after the legal check so that a
-                    # space at the end of a line does not push it over the max_w
-                    # and incorrectly cause it to be illegal.
-                    # And multiplying it by `new_fword.xspace` (a bool) prevents
-                    # an extraneous space after indent (for example).
-                    cur_w = cand_w + space_w * new_fword.xspace
+                    # space at the end of a line does not push it over max_w
+                    # (i.e. )incorrectly render it illegal).
+                    if new_fword.xspace:
+                        cur_w = cand_w + space_w
 
             if current_line_to_add == candidate_line_list \
                     or last_word_is_candidate:
