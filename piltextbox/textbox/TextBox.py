@@ -49,6 +49,17 @@ class TextBox:
     `.set_truetype_font()` method BEFORE attempting to write any
     formatted text. Otherwise, all formatted text will simply use the
     main font that was set at the time.
+        Example (for a TextBox object stored as variable `tb`):
+        ```
+        # Set 'main' font (also sets `.font` instance variable).
+        tb.set_truetype_font(
+            size=14, `typeface='<filepath1>' style='main')
+
+        # Do not need to specify size after it's been set for 'main'.
+        tb.set_truetype_font(typeface='<filepath2>' style='bold')
+        tb.set_truetype_font(typeface='<filepath3>' style='ital')
+        tb.set_truetype_font0(typeface='<filepath4>' style='boldital')
+        ```
 
     Include these format codes within the string passed to the writing
     method (AND specify `formatting=True` in the method) in order to
@@ -138,6 +149,27 @@ class TextBox:
 
         # The main cursor (coord location where text can be written)
         self.text_cursor = (0, 0)
+
+    @staticmethod
+    def new_same_as(tb):
+        """
+        Generate and return a new (blank) TextBox object, using the same
+        settings as another TextBox (passed as `tb`).
+        :param tb: The TextBox whose attributes should be copied.
+        """
+        new_tb = TextBox(
+            size=tb._size,
+            typeface=tb.typeface,
+            font_size=tb.font_size,
+            bg_RGBA=tb._bg_RGBA,
+            font_RGBA=tb.font_RGBA,
+            paragraph_indent=tb.paragraph_indent,
+            new_line_indent=tb.new_line_indent,
+            spacing=tb.spacing,
+            margins=tb._margins)
+        # Will copy the dict, but not the ImageFont objects it has stored
+        new_tb.formatted_fonts = tb.formatted_fonts.copy()
+        return new_tb
 
     def _new_tb(self):
         """
