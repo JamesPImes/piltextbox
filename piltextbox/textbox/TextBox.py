@@ -407,8 +407,11 @@ class TextBox:
         formatting and only write plain text. (Will have no effect
         unless parameter `formatting=` is True AND `text` was passed as
         a string.)
-        :return: Returns an UnwrittenLines object containing the lines
-        that could NOT be written.
+        :return: Returns as follows:
+        -- All lines successfully written -> returns None
+        -- At least one line was not written -> returns an
+            UnwrittenLines object containing the lines that could NOT be
+            written.
         """
 
         # If any of these parameters were not spec'd, pull from attribs
@@ -454,6 +457,9 @@ class TextBox:
 
             # Successfully wrote that line, so remove it from unwritten.
             unwritten._successful_write()
+
+        if unwritten.remaining == 0:
+            return None
 
         return unwritten
 
