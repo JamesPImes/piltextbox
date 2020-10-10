@@ -5,8 +5,8 @@ descrip = 'Streamlined text writing on images, using the Pillow (PIL) library'
 long_description = (
     "An extension for the Pillow (PIL) library for streamlined "
     "writing of text in an image, with automatic textwrapping and "
-    "indendation, optional text-block justification, and configurable font "
-    "settings.\n\n"
+    "indendation, optional text-block justification, configurable font "
+    "settings, and basic bold/italic formatting.\n\n"
     "Visit [the GitHub repository](https://github.com/JamesPImes/piltextbox) "
     "for a quickstart guide."
 )
@@ -14,7 +14,9 @@ long_description = (
 setup(
     name='piltextbox',
     version='0.1',
-    packages=['piltextbox', 'piltextbox.textbox'],
+    packages=[
+        'piltextbox', 'piltextbox.textbox', 'piltextbox.textbox.formatting'
+    ],
     url='https://github.com/JamesPImes/piltextbox',
     license='MIT',
     author='James P. Imes',
