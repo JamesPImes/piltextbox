@@ -599,6 +599,9 @@ class TextBox:
         else:
             raise bad_text_error
 
+        if not self.at_new_line(cursor):
+            self.next_line_cursor(cursor)
+
         if reserve_last_line and self.on_last_line(cursor=cursor):
             return text
 
