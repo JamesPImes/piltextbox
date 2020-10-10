@@ -1,6 +1,6 @@
 # piltextbox
 
-A package for streamlined writing of text in an image with the [Pillow (PIL) library](https://pypi.org/project/Pillow/), with automatic textwrapping and indendation, optional text-block justification, and configurable font settings.
+An extension for the [Pillow (PIL) library](https://pypi.org/project/Pillow/) for streamlined writing of text in an image, with automatic textwrapping and indendation, optional text-block justification, configurable font settings, and basic bold/italic formatting.
 
 ### To install
 ```
@@ -12,11 +12,9 @@ pip install piltextbox
 
 *Note: The examples below use several of the [Liberation](https://github.com/liberationfonts) fonts, which are not included in this package.*
 
+Text can be [written as lines or paragraphs](https://github.com/JamesPImes/piltextbox#writing-lines-and-paragraphs-optionally-justified), or written [one word at a time](https://github.com/JamesPImes/piltextbox#writing-text-one-word-at-a-time-justification-not-possible). To bold/italicize any or all words, use [formatting codes, along with the `formatting=True` parameter](https://github.com/JamesPImes/piltextbox#writing-formatted-text-bolditalicized) in any of those methods.
+
 #### Writing plain (unformatted) text
-
-Text can be [written as lines or paragraphs](), or written [one word at a time](). To bold/italicize any or all words, use [formatting codes, along with the `formatting=True` parameter]() in any of those methods.
-
-
 
 The quickstart example code for writing plain text below will write these lines:
 
