@@ -1,4 +1,5 @@
 from setuptools import setup
+import piltextbox._constants as constants
 
 descrip = 'Streamlined text writing on images, using the Pillow (PIL) library'
 
@@ -13,14 +14,14 @@ long_description = (
 
 setup(
     name='piltextbox',
-    version='0.1',
+    version=constants.__version__,
     packages=[
         'piltextbox', 'piltextbox.textbox', 'piltextbox.textbox.formatting'
     ],
-    url='https://github.com/JamesPImes/piltextbox',
+    url=constants.__website__,
     license='MIT',
-    author='James P. Imes',
-    author_email='jamesimes@gmail.com',
+    author=constants.__author__,
+    author_email=constants.__email__,
     description=descrip,
     long_description=long_description,
     long_description_content_type="text/markdown",
