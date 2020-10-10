@@ -66,7 +66,8 @@ print(unwritten_line_2)  # Was also successfully written, so prints None
 # manually move the cursor down a line).
 tb1.next_line_cursor()
 
-# Write the paragraph of text, unjustified. Any lines that can't be
+# Write the paragraph of text, unjustified. If all lines were successfully
+# written, it will return None; however, any lines that could not be
 # written are returned as an UnwrittenLines object, which can be passed
 # to `.continue_paragraph()` method on another equally configured TextBox
 unwrit_lines_1 = tb1.write_paragraph(paragraph_sample)
