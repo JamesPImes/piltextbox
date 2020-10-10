@@ -7,16 +7,16 @@ tb = piltextbox.TextBox((400, 1600), paragraph_indent=4, new_line_indent=12)
 # These are not included in the `piltextbox` github repo, but can be acquired at
 # <https://github.com/liberationfonts/liberation-fonts/releases/tag/2.1.1>
 test_fonts = {
-    'default': r'testing_fonts\LiberationSans-Regular.ttf',
-    'bold': r'testing_fonts\LiberationSans-Bold.ttf',
-    'ital': r'testing_fonts\LiberationSans-Italic.ttf',
-    'boldital': r'testing_fonts\LiberationSans-BoldItalic.ttf'
+    'test_regular': r'testing_fonts\LiberationSans-Regular.ttf',
+    'test_bold': r'testing_fonts\LiberationSans-Bold.ttf',
+    'test_ital': r'testing_fonts\LiberationSans-Italic.ttf',
+    'test_boldital': r'testing_fonts\LiberationSans-BoldItalic.ttf'
 }
 
-tb.set_truetype_font(typeface=test_fonts['default'])
-tb.set_truetype_font(typeface=test_fonts['bold'], style='bold')
-tb.set_truetype_font(typeface=test_fonts['ital'], style='ital')
-tb.set_truetype_font(typeface=test_fonts['boldital'], style='boldital')
+tb.set_truetype_font(typeface=test_fonts['test_regular'])
+tb.set_truetype_font(typeface=test_fonts['test_bold'], style='bold')
+tb.set_truetype_font(typeface=test_fonts['test_ital'], style='ital')
+tb.set_truetype_font(typeface=test_fonts['test_boldital'], style='boldital')
 #tb.set_truetype_font(typeface=test_fonts['default'], formatting='intentional_error')
 
 
@@ -31,16 +31,15 @@ and used </b>in the United States to plat, or</i> divide, real property for sale
 tb.write(long_txt)
 tb.write(long_txt, formatting=True)
 tb.write(long_txt, formatting=True, discard_formatting=True)
-tb.render().show()
+#tb.render().show()
 
-
-# # write individual lines
-# tb.write_line(txt)
-# tb.write_line(txt, formatting=True)
-# tb.write_line(txt, formatting=True, discard_formatting=True)
-# tb.write_line(txt, justify=True)
-# tb.write_line(txt, formatting=True, justify=True)
-# tb.render().show()
+# write individual lines
+tb.write_line(txt)
+tb.write_line(txt, formatting=True)
+tb.write_line(txt, formatting=True, discard_formatting=True)
+tb.write_line(txt, justify=True)
+tb.write_line(txt, formatting=True, justify=True)
+#tb.render().show()
 
 # write paragraphs
 unwrit = tb.write_paragraph(long_txt)
@@ -58,28 +57,22 @@ print(tb.simplify_unwritten(unwrit))
 
 uw = tb.write("Testing one, two, three")
 print(tb.simplify_unwritten(uw, exclude_indent=True))
-#
-# uw = tb.write_line("Testing four, five")
-# print(tb.simplify_unwritten(uw, exclude_indent=True))
-#
-# uw = tb.write_line("Testing six, seven", formatting=True)
-# print(tb.simplify_unwritten(uw, exclude_indent=True))
-#
-# tb.render().show()
+
+uw = tb.write_line("Testing four, five")
+print(tb.simplify_unwritten(uw, exclude_indent=True))
+
+uw = tb.write_line("Testing six, seven", formatting=True)
+print(tb.simplify_unwritten(uw, exclude_indent=True))
+
+tb.render().show()
 
 
 # continue writing
 
-tb2 = piltextbox.TextBox((400,1600), paragraph_indent=4, new_line_indent=12)
-
-tb2.set_truetype_font(typeface=test_fonts['default'])
-tb2.set_truetype_font(typeface=test_fonts['bold'], style='bold')
-tb2.set_truetype_font(typeface=test_fonts['ital'], style='ital')
-tb2.set_truetype_font(typeface=test_fonts['boldital'], style='boldital')
-
+tb2 = piltextbox.TextBox.new_same_as(tb)
 
 tb2.continue_paragraph(unwrit, justify=True)
-tb2.write(uw)
+tb2.write_paragraph(long_txt, formatting=True)
 
 tb2.render().show()
 
