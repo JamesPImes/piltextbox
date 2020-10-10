@@ -1155,6 +1155,7 @@ class TextBox:
                         fwords.insert(0, new_fword)
                     current_line_to_add = []
                     last_word_is_candidate = True
+                    at_new_line = True
 
                     # Reset cur_w to 0, plus width of indent and first word
                     cur_w = 0
@@ -1167,8 +1168,9 @@ class TextBox:
                     # char), but wait until after the legal check so that a
                     # space at the end of a line does not push it over max_w
                     # (i.e. )incorrectly render it illegal).
+                    cur_w = cand_w
                     if new_fword.xspace:
-                        cur_w = cand_w + space_w
+                        cur_w += space_w
 
             if current_line_to_add == candidate_line_list \
                     or last_word_is_candidate:
