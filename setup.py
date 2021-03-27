@@ -1,5 +1,4 @@
 from setuptools import setup
-import piltextbox._constants as constants
 
 descrip = 'Streamlined text writing on images, using the Pillow (PIL) library'
 
@@ -12,16 +11,37 @@ long_description = (
     "for a quickstart guide."
 )
 
+MODULE_DIR = 'piltextbox'
+
+
+def get_constant(constant):
+    setters = {
+        "version": "__version__ = ",
+        "author": "__author__ = ",
+        "author_email": "__email__ = ",
+        "url": "__website__ = "
+    }
+    var_setter = setters[constant]
+    with open(rf".\{MODULE_DIR}\_constants.py", "r") as file:
+        for line in file:
+            if line.startswith(var_setter):
+                version = line[len(var_setter):].strip('\'\n \"')
+                return version
+        raise RuntimeError(f"Could not get {constant} info.")
+
+
 setup(
     name='piltextbox',
-    version=constants.__version__,
+    version=get_constant('version'),
     packages=[
-        'piltextbox', 'piltextbox.textbox', 'piltextbox.textbox.formatting'
+        'piltextbox',
+        'piltextbox.textbox',
+        'piltextbox.textbox.formatting'
     ],
-    url=constants.__website__,
+    url=get_constant('url'),
     license='MIT',
-    author=constants.__author__,
-    author_email=constants.__email__,
+    author=get_constant('author'),
+    author_email=get_constant('author_email'),
     description=descrip,
     long_description=long_description,
     long_description_content_type="text/markdown",
